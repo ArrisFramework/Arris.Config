@@ -13,6 +13,9 @@ use Throwable;
  */
 class Yaml implements ParserInterface
 {
+    /**
+     * @throws UnsupportedFormatException
+     */
     public function __construct()
     {
         if (!class_exists(YamlParser::class)) {
@@ -40,7 +43,7 @@ class Yaml implements ParserInterface
     /**
      * {@inheritDoc}
      */
-    public function parseString($config)
+    public function parseString($config): array
     {
         try {
             $data = YamlParser::parse($config, YamlParser::PARSE_CONSTANT);
