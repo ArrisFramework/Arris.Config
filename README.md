@@ -1,112 +1,259 @@
 # Arris.Config
 
-Конфигуратор экосистемы Arris. Включает:
+Небольшой пакет для чтения конфигурации. Работает сам по себе, без фреймворка Arris.
 
-- низкоуровневый читатель/писатель конфигов `Arris\Core\Config\Config` (PHP, INI, JSON, XML, YAML, Properties, Serialize);
-- прикладной класс `Arris\AppConfig` — загрузка конфиг-файлов с дефолтами и рекурсивным слиянием.
+Умеет читать:
 
-## Requirements
+- PHP-файлы, которые возвращают массив;
+- INI;
+- JSON;
+- YAML (нужен `symfony/yaml`);
+- TOML (нужен `internal/toml`).
 
-- PHP 8.2+
+Писать конфиги обратно в файлы пакет не умеет — только читает.
 
-> **IMPORTANT:** Если нужны YAML-файлы или строки, подключите [Symfony Yaml component](https://github.com/symfony/Yaml) (`composer require symfony/yaml`).
+## Установка
 
-## Installation
-
-```sh
-$ composer require karelwintersky/arris.config
+```bash
+composer require karelwintersky/arris.config
 ```
 
-## Usage
+Для YAML и TOML нужны отдельные библиотеки:
 
-### AppConfig (рекомендуется)
+```bash
+composer require symfony/yaml
+composer require internal/toml
+```
 
-Загружает файлы и сливает их с дефолтами. `null` в файле удаляет ключ из дефолтов, массивы сливаются рекурсивно.
+PHP, INI и JSON работают без дополнительных зависимостей.
+
+## Быстрый старт
 
 ```php
 use Arris\AppConfig;
 
 $config = new AppConfig(
-    ['config.json', '?config.local.json'],  // '?' - опциональный файл
-    ['db' => ['host' => 'localhost', 'port' => 3306]]
+    ['config.php', '?config.local.php'],
+    [
+        'app' => [
+            'debug' => false,
+        ],
+        'database' => [
+            'host' => 'localhost',
+            'port' => 3306,
+        ],
+    ]
 );
 
-$host = $config->get('db.host');          // из файла или дефолта
-$config->set('app.debug', true);          // установить
-$config->add(['cache' => ['ttl' => 300]]); // массовое слияние
-$config->replace([...]);                   // заменить целиком
+$config->get('database.host'); // localhost
+$config->get('database.port'); // 3306
 ```
 
-Доступ через dot-нотацию, `ArrayAccess` и итерацию.
+Файлы загружаются поверх значений по умолчанию. Если файла с `?` нет — ничего не ломается, он просто пропускается.
 
-### Config (низкоуровневый)
+Можно передать один файл строкой или директорию:
+
+```php
+$config = new AppConfig('config.yaml', $defaults);
+$config = new AppConfig(__DIR__ . '/config', $defaults);
+```
+
+Можно собрать конфиг из строки:
+
+```php
+use Arris\Core\Config\Parser\Json;
+
+$config = AppConfig::fromString($json, new Json(), $defaults);
+```
+
+## Как обращаться к ключам
+
+Внутри конфига ключи — это обычные строки. Точка в имени ключа ничем не особенна.
+
+А вот в **выражении доступа** точка означает переход на уровень вложенности:
+
+```php
+$config->get('database.host');    // ключ host внутри database
+$config->get('a\\.b');            // один ключ с именем "a.b"
+$config->get('a.b\\.c');          // ключ a -> "b.c"
+```
+
+То есть:
+
+```php
+$config->set('database.host', 'localhost');
+// получится ['database' => ['host' => 'localhost']]
+
+$config->set('database\\.host', 'localhost');
+// получится ['database.host' => 'localhost']
+```
+
+Массивы, которые вы передаёте в `add()`, `replace()` или в конструктор, **не разворачиваются**:
+
+```php
+$config->add(['a.b' => 1]);
+// это литеральный ключ 'a.b', а не вложенность
+
+$config->add(['a' => ['b' => 1]]);
+// а вот это — вложенность
+```
+
+Так сделано специально: `all()` можно передать обратно в `replace()` без неожиданной перестройки ключей.
+
+## Изменение конфига
+
+### `set()` — аккуратное изменение
+
+`set()` умеет создавать вложенные ключи, но не меняет тип уже существующего узла.
+
+```php
+$config->set('app.debug', true);
+$config->set('app.logging.enabled', true);
+
+$config->get('app.logging'); // ['enabled' => true]
+```
+
+Если узел уже существует:
+
+- скаляр заменяется скаляром;
+- список заменяется списком;
+- ассоциативные массивы сливаются;
+- пустой массив `[]` очищает существующий массив.
+
+А вот менять скаляр на массив и наоборот через `set()` нельзя:
+
+```php
+$config->set('app', true);
+$config->set('app.debug', true); // ошибка: app уже скаляр
+```
+
+```php
+$config->set('app.debug', true);
+$config->set('app', true); // ошибка: app уже массив
+```
+
+В таких случаях нужно явно сказать, что вы заменяете узел:
+
+```php
+$config->replace('app', true);
+// или
+$config->remove('app');
+$config->set('app.debug', true);
+```
+
+`null` в `set()` использовать нельзя — для удаления есть `remove()`, для записи `null` — `replace()`.
+
+### `replace()` — явная замена
+
+```php
+$config->replace('app', true);             // заменить узел целиком
+$config->replace('app', ['debug' => true]); // заменить массив целиком, без слияния
+$config->replace('app', null);             // записать null
+$config->replace(['app' => ['debug' => true]]); // заменить весь конфиг
+```
+
+### `remove()`
+
+```php
+$config->remove('app.debug');
+```
+
+## Значения по умолчанию и файлы
+
+`AppConfig` считает значения по умолчанию базой, а файлы — слоями поверх неё.
+
+- ассоциативные массивы сливаются;
+- списки заменяются целиком;
+- скаляр может заменить массив и наоборот — файл сильнее;
+- `null` в файле удаляет ключ из значений по умолчанию;
+- `null` в значениях по умолчанию — это обычное значение.
+
+## Низкоуровневый `Config`
+
+Если значения по умолчанию не нужны, можно читать файлы напрямую:
 
 ```php
 use Arris\Core\Config\Config;
+
+$config = new Config('config.json');
+$config = Config::load(['config.php', '?config.local.php']);
+$config = new Config(__DIR__ . '/config');
+```
+
+Из строки:
+
+```php
 use Arris\Core\Config\Parser\Json;
+use Arris\Core\Config\Parser\Yaml;
+use Arris\Core\Config\Parser\Toml;
 
-// Один файл
-$conf = Config::load('config.json');
-$conf = new Config('config.json');
-
-// Несколько файлов
-$conf = new Config(['config.json', 'config.xml']);
-
-// Директория (glob по алфавиту)
-$conf = new Config(__DIR__ . '/config');
-
-// Опциональные файлы
-$conf = new Config(['config.dist.json', '?config.json']);
-
-// Указанный парсер (применяется ко всем файлам)
-$conf = new Config('configuration.config', new Json);
-
-// Из строки
-$conf = Config::load($settingsJson, new Json, true);
-
-// Сохранение (кроме PHP)
-$conf->toFile('config.yaml');
-$ini = $conf->toString(new \Arris\Core\Config\Writer\Ini());
+$config = Config::fromString($json, new Json());
+$config = Config::fromString($yaml, new Yaml());
+$config = Config::fromString($toml, new Toml());
 ```
 
-При загрузке нескольких файлов значения дублирующихся ключей берутся из последнего файла.
+### Директории
 
-**Warning:** Не включайте непроверенные конфиги в PHP-формате — он может выполнять произвольный код.
+Из директории загружаются только файлы поддерживаемых форматов.
 
-### Наследование AbstractConfig
+- файлы сортируются по имени;
+- `.bak`-файлы пропускаются;
+- `.dist` не поддерживается;
+- файлы с неподдерживаемым расширением пропускаются;
+- поддиректории не загружаются;
+- расширение можно писать в любом регистре (`.JSON` тоже подойдёт).
 
-Для конфига «без файлового I/O» расширьте `AbstractConfig` и заполните `getDefaults()`:
+### INI
+
+INI читается как есть. Ключи с точками остаются литеральными:
+
+```ini
+network.http.host = localhost
+
+[application]
+name = configuration
+```
 
 ```php
-use Arris\Core\Config\AbstractConfig;
-
-class MyConfig extends AbstractConfig
-{
-    protected function getDefaults()
-    {
-        return [
-            'host' => 'localhost',
-            'port' => 80
-        ];
-    }
-}
+$config->get('network\\.http\\.host'); // localhost
+$config->get('application.name');      // configuration
 ```
 
-### Слияние инстансов
+## Слияние и `all()`
+
+`all()` возвращает весь конфиг массивом.
 
 ```php
-$conf1 = Config::load('conf1.json');
-$conf2 = Config::load('conf2.json');
-$conf1->merge($conf2);
+$all = $config->all();
 ```
 
-## Testing
+Если нужно получить точную копию:
 
-``` bash
-$ composer install
-$ vendor/bin/phpunit
+```php
+$copy = new AppConfig();
+$copy->replace($all);
 ```
 
-## License
+`add($all)` тоже сработает, но `null`-значения при этом удалятся: для `add()` `null` означает «удалить ключ».
 
-The MIT License (MIT).
+## Исключения
+
+- `StructureConflictException` — попытка изменить тип узла через `set()`.
+- `InvalidValueException` — `null` в `set()`.
+- `FileNotFoundException` — файл не найден.
+- `EmptyDirectoryException` — директория пустая или в ней нет подходящих файлов.
+- `UnsupportedFormatException` — неизвестный формат.
+- `ParseException` — ошибка разбора файла или строки.
+
+Все они лежат в `Arris\Core\Config\Exception`.
+
+## Тесты
+
+```bash
+composer install
+vendor/bin/phpunit
+```
+
+## Лицензия
+
+MIT.
