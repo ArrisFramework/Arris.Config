@@ -45,7 +45,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithInvalidPath()
     {
@@ -58,7 +58,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithEmptyDirectory()
     {
@@ -70,7 +70,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithArray()
     {
@@ -87,7 +87,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithArrayWithNonexistentFile()
     {
@@ -105,7 +105,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithArrayWithOptionalFile()
     {
@@ -122,7 +122,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithArrayWithOptionalNonexistentFile()
     {
@@ -139,7 +139,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithDirectory()
     {
@@ -155,7 +155,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithYml()
     {
@@ -171,7 +171,7 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithEmptyYml()
     {
@@ -186,7 +186,7 @@ class ConfigTest extends TestCase
     /**
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testConstructWithFileParser()
     {
@@ -224,7 +224,7 @@ class ConfigTest extends TestCase
 
     /**
      * @covers Config::loadFromFile()
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testDottedKeysStayLiteral()
     {
@@ -252,17 +252,29 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testArrayPathMustContainStrings()
     {
-        $this->expectException(\Arris\Core\Config\Exception\FileNotFoundException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         new Config([['a']]);
     }
 
     /**
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
+     */
+    public function testNestedArrayPathIsInvalid()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new Config([
+            'custom' => ['ccc.yaml', 'ddd.yaml'],
+        ]);
+    }
+
+    /**
+     * @covers Config::resolveSources()
      */
     public function testDirectoryLoadingIgnoresSubdirectories()
     {
@@ -281,7 +293,7 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      * @covers Config::getExtension()
      */
     public function testDirectorySkipsUnsupportedFilesAndNormalizesExtensionCase()
@@ -306,7 +318,7 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @covers Config::getValidPath()
+     * @covers Config::resolveSources()
      */
     public function testCustomParserLoadsDirectoryWithoutExtensionFilter()
     {

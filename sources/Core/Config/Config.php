@@ -7,6 +7,8 @@ use Arris\Core\Config\Exception\EmptyDirectoryException;
 use Arris\Core\Config\Exception\FileNotFoundException;
 use Arris\Core\Config\Exception\UnsupportedFormatException;
 use Arris\Core\Config\Parser\ParserInterface;
+use FilesystemIterator;
+use InvalidArgumentException;
 
 /**
  * Read-only configuration loader.
@@ -89,9 +91,8 @@ class Config extends AbstractConfig
     {
         $data = [];
 
-        foreach ($this->getValidPath($path, $parser === null) as $file) {
-            $fileParser = $parser ?? $this->getParser($this->getExtension($file));
-            $data = KeyPath::mergeBase($data, $fileParser->parseFile($file));
+        foreach ($this->resolveSources($path, $parser, $parser === null) as $source) {
+            $data = KeyPath::mergeBase($data, $source['parser']->parseFile($source['path']));
         }
 
         return $data;
@@ -161,67 +162,106 @@ class Config extends AbstractConfig
     }
 
     /**
-     * Resolves a path (file, directory or an array of them) into a list of files.
+     * Resolves all sources before any file is parsed.
      *
-     * @throws EmptyDirectoryException If `$path` is an empty directory
-     * @throws FileNotFoundException If a file is not found at `$path`
+     * @return list<array{path: string, parser: ParserInterface}>
+     *
+     * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
-    protected function getValidPath(string|array $path, bool $filterBySupported = true): array
-    {
-        if (is_array($path)) {
-            $paths = [];
+    private function resolveSources(
+        string|array $paths,
+        ?ParserInterface $forcedParser,
+        bool $filterBySupported
+    ): array {
+        $sources = [];
+        $entries = is_array($paths) ? $paths : [$paths];
 
-            foreach ($path as $unverifiedPath) {
-                if (!is_string($unverifiedPath)) {
-                    throw new FileNotFoundException('Configuration path must be a string');
-                }
-
-                $isOptional = str_starts_with($unverifiedPath, '?');
-                $realPath = $isOptional ? substr($unverifiedPath, 1) : $unverifiedPath;
-
-                try {
-                    $paths = array_merge($paths, $this->getValidPath($realPath, $filterBySupported));
-                } catch (FileNotFoundException $e) {
-                    if (!$isOptional) {
-                        throw $e;
-                    }
-                }
+        foreach ($entries as $entry) {
+            if (!is_string($entry)) {
+                throw new InvalidArgumentException('Configuration path must be a string');
             }
 
-            return $paths;
+            $optional = str_starts_with($entry, '?');
+            $realPath = $optional ? substr($entry, 1) : $entry;
+
+            if ($optional && !file_exists($realPath)) {
+                continue;
+            }
+
+            foreach ($this->resolvePath($realPath, $filterBySupported) as $file) {
+                $parser = $forcedParser ?? $this->getParser($this->getExtension($file));
+                $sources[] = ['path' => $file, 'parser' => $parser];
+            }
         }
 
+        return $sources;
+    }
+
+    /**
+     * Resolves one path (file or directory) into a list of files.
+     *
+     * @throws EmptyDirectoryException If `$path` is an empty directory
+     * @throws FileNotFoundException If the path does not exist or is not readable
+     */
+    private function resolvePath(string $path, bool $filterBySupported): array
+    {
         if ($path === '') {
             throw new FileNotFoundException('Configuration file: [] cannot be found');
         }
 
+        if (is_file($path)) {
+            if (!is_readable($path)) {
+                throw new FileNotFoundException("Configuration file: [$path] is not readable");
+            }
+
+            return [$path];
+        }
+
         if (is_dir($path)) {
-            $paths = glob($path . '/*.*') ?: [];
-            $paths = array_values(array_filter($paths, function (string $file) use ($filterBySupported): bool {
-                if (!is_file($file) || $this->isIgnoredFile($file)) {
-                    return false;
+            $files = [];
+
+            foreach (new FilesystemIterator($path) as $fileInfo) {
+                if (!$fileInfo->isFile()) {
+                    continue;
                 }
 
-                return !$filterBySupported || $this->supportsExtension($this->getExtension($file));
-            }));
+                $filename = $fileInfo->getFilename();
 
-            if ($paths === []) {
+                // Keep the old behavior: hidden files are not config sources.
+                if ($filename === '' || $filename[0] === '.') {
+                    continue;
+                }
+
+                $file = $fileInfo->getPathname();
+
+                if ($this->isIgnoredFile($file)) {
+                    continue;
+                }
+
+                if ($filterBySupported && !$this->supportsExtension($this->getExtension($file))) {
+                    continue;
+                }
+
+                $files[] = $file;
+            }
+
+            if ($files === []) {
                 throw new EmptyDirectoryException("Configuration directory: [$path] is empty");
             }
 
-            sort($paths);
+            sort($files);
 
-            return $paths;
+            return $files;
         }
 
-        if (!file_exists($path)) {
-            if ($this->ignore_non_existent_files) {
-                return [];
-            }
-
-            throw new FileNotFoundException("Configuration file: [$path] cannot be found");
+        if (file_exists($path)) {
+            return [$path];
         }
 
-        return [$path];
+        if ($this->ignore_non_existent_files) {
+            return [];
+        }
+
+        throw new FileNotFoundException("Configuration file: [$path] cannot be found");
     }
 }
