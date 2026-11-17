@@ -33,8 +33,8 @@ PHP, INI и JSON работают без дополнительных завис
 use Arris\AppConfig;
 
 $config = new AppConfig(
-    ['config.php', '?config.local.php'],
-    [
+    files: ['config.php', '?config.local.php'],
+    defaults: [
         'app' => [
             'debug' => false,
         ],
