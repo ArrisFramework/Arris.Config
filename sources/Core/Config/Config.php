@@ -19,7 +19,7 @@ class Config extends AbstractConfig
      * Parsers supported by Config. An extension is resolved to the first parser
      * that declares it.
      *
-     * @var string[]
+     * @var list<class-string<ParserInterface>>
      */
     protected array $supportedParsers = [
         Parser\Php::class,
@@ -148,6 +148,7 @@ class Config extends AbstractConfig
         $this->parserMap = [];
 
         foreach ($this->supportedParsers as $class) {
+            /** @var class-string<ParserInterface> $class */
             foreach ($class::getSupportedExtensions() as $extension) {
                 $this->parserMap[strtolower($extension)] ??= $class;
             }
