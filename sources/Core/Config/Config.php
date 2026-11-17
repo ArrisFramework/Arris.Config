@@ -40,14 +40,14 @@ class Config extends AbstractConfig
     private ?array $parserMap = null;
 
     /**
-     * @param string|array $values Filename(s), directory, or an empty array
+     * @param array $values Filename(s), directory, or an empty array
      * @param ParserInterface|null $parser Force this parser for every file
      * @param bool $ignoreNonExistentFiles Skip missing files instead of throwing
      *
      * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException
      */
     public function __construct(
-        string|array $values = [],
+        array $values = [],
         ?ParserInterface $parser = null,
         bool $ignoreNonExistentFiles = false
     ) {
@@ -61,11 +61,22 @@ class Config extends AbstractConfig
      * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException
      */
     public static function load(
-        string|array $values = [],
+        array $values = [],
         ?ParserInterface $parser = null,
         bool $ignoreNonExistentFiles = false
     ): static {
         return new static($values, $parser, $ignoreNonExistentFiles);
+    }
+
+    /**
+     * Static loader for a single file.
+     */
+    public static function fromFile(
+        string $file,
+        ?ParserInterface $parser = null,
+        bool $ignoreNonExistentFiles = false
+    ): static {
+        return new static([$file], $parser, $ignoreNonExistentFiles);
     }
 
     /**
@@ -87,7 +98,7 @@ class Config extends AbstractConfig
      *
      * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException
      */
-    protected function loadFromFile(string|array $path, ?ParserInterface $parser = null): array
+    protected function loadFromFile(array $path, ?ParserInterface $parser = null): array
     {
         $data = [];
 
@@ -169,14 +180,13 @@ class Config extends AbstractConfig
      * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
     private function resolveSources(
-        string|array $paths,
+        array $paths,
         ?ParserInterface $forcedParser,
         bool $filterBySupported
     ): array {
         $sources = [];
-        $entries = is_array($paths) ? $paths : [$paths];
 
-        foreach ($entries as $entry) {
+        foreach ($paths as $entry) {
             if (!is_string($entry)) {
                 throw new InvalidArgumentException('Configuration path must be a string');
             }

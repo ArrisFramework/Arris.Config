@@ -220,12 +220,12 @@ class AppConfigTest extends TestCase
     }
 
     #[Test]
-    public function constructorAcceptsSingleFileString(): void
+    public function fromFileAcceptsSingleFile(): void
     {
         $configFile = $this->tempDir . '/single.json';
         file_put_contents($configFile, '{"a":1}');
 
-        $config = new AppConfig($configFile);
+        $config = AppConfig::fromFile($configFile);
 
         $this->assertSame(1, $config->get('a'));
     }

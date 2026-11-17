@@ -25,7 +25,7 @@ class ConfigTest extends TestCase
     {
         $this->expectException(\Arris\Core\Config\Exception\UnsupportedFormatException::class);
         $this->expectExceptionMessage('Unsupported configuration format');
-        $config = Config::load(__DIR__ . '/mocks/fail/error.lib');
+        $config = Config::load([__DIR__ . '/mocks/fail/error.lib']);
         // $this->markTestIncomplete('Not yet implemented');
     }
 
@@ -38,7 +38,7 @@ class ConfigTest extends TestCase
     {
         $this->expectException(\Arris\Core\Config\Exception\UnsupportedFormatException::class);
         $this->expectExceptionMessage('Unsupported configuration format');
-        $config = new Config(__DIR__ . '/mocks/fail/error.lib');
+        $config = new Config([__DIR__ . '/mocks/fail/error.lib']);
     }
 
     /**
@@ -51,7 +51,7 @@ class ConfigTest extends TestCase
     {
         $this->expectException(\Arris\Core\Config\Exception\FileNotFoundException::class);
         $this->expectExceptionMessage('Configuration file: [ladadeedee] cannot be found');
-        $config = new Config('ladadeedee');
+        $config = new Config(['ladadeedee']);
     }
 
     /**
@@ -63,7 +63,7 @@ class ConfigTest extends TestCase
     public function testConstructWithEmptyDirectory()
     {
         $this->expectException(\Arris\Core\Config\Exception\EmptyDirectoryException::class);
-        $config = new Config(__DIR__ . '/mocks/empty');
+        $config = new Config([__DIR__ . '/mocks/empty']);
     }
 
     /**
@@ -143,7 +143,7 @@ class ConfigTest extends TestCase
      */
     public function testConstructWithDirectory()
     {
-        $config = new Config(__DIR__ . '/mocks/dir');
+        $config = new Config([__DIR__ . '/mocks/dir']);
 
         $expected = 'localhost';
         $actual   = $config->get('host');
@@ -159,7 +159,7 @@ class ConfigTest extends TestCase
      */
     public function testConstructWithYml()
     {
-        $config = new Config(__DIR__ . '/mocks/pass/config.yml');
+        $config = new Config([__DIR__ . '/mocks/pass/config.yml']);
 
         $expected = 'localhost';
         $actual   = $config->get('host');
@@ -175,7 +175,7 @@ class ConfigTest extends TestCase
      */
     public function testConstructWithEmptyYml()
     {
-        $config = new Config(__DIR__ . '/mocks/pass/empty.yaml');
+        $config = new Config([__DIR__ . '/mocks/pass/empty.yaml']);
 
         $expected = [];
         $actual   = $config->all();
@@ -190,12 +190,22 @@ class ConfigTest extends TestCase
      */
     public function testConstructWithFileParser()
     {
-        $config = new Config(__DIR__ . '/mocks/pass/json.config', new JsonParser());
+        $config = new Config([__DIR__ . '/mocks/pass/json.config'], new JsonParser());
 
         $expected = 'localhost';
         $actual   = $config->get('host');
 
         $this->assertSame($expected, $actual);
+    }
+
+    /**
+     * @covers Config::fromFile()
+     */
+    public function testFromFileAcceptsSingleFile()
+    {
+        $config = Config::fromFile(__DIR__ . '/mocks/pass/config.json');
+
+        $this->assertSame('localhost', $config->get('host'));
     }
 
     /**
@@ -228,7 +238,7 @@ class ConfigTest extends TestCase
      */
     public function testDottedKeysStayLiteral()
     {
-        $config = new Config(__DIR__ . '/mocks/pass/config2.ini');
+        $config = new Config([__DIR__ . '/mocks/pass/config2.ini']);
 
         $this->assertSame('localhost', $config->get('network\\.http\\.host'));
         $this->assertSame('80', $config->get('network\\.http\\.port'));
@@ -283,7 +293,7 @@ class ConfigTest extends TestCase
         file_put_contents($dir . '/config.json', '{"host":"localhost"}');
 
         try {
-            $config = new Config($dir);
+            $config = new Config([$dir]);
             $this->assertSame('localhost', $config->get('host'));
         } finally {
             unlink($dir . '/config.json');
@@ -306,7 +316,7 @@ class ConfigTest extends TestCase
         file_put_contents($dir . '/README.md', '# not a config');
 
         try {
-            $config = new Config($dir);
+            $config = new Config([$dir]);
             $this->assertSame('localhost', $config->get('host'));
         } finally {
             unlink($dir . '/CONFIG.JSON');
@@ -327,7 +337,7 @@ class ConfigTest extends TestCase
         file_put_contents($dir . '/config.weird', '{"host":"localhost"}');
 
         try {
-            $config = new Config($dir, new JsonParser());
+            $config = new Config([$dir], new JsonParser());
             $this->assertSame('localhost', $config->get('host'));
         } finally {
             unlink($dir . '/config.weird');
@@ -342,12 +352,12 @@ class ConfigTest extends TestCase
     {
         return array_merge(
             [
-                [new Config(__DIR__ . '/mocks/pass/config-exec.php')],
-                [new Config(__DIR__ . '/mocks/pass/config.ini')],
-                [new Config(__DIR__ . '/mocks/pass/config.json')],
-                [new Config(__DIR__ . '/mocks/pass/config.php')],
-                [new Config(__DIR__ . '/mocks/pass/config.toml')],
-                [new Config(__DIR__ . '/mocks/pass/config.yaml')]
+                [new Config([__DIR__ . '/mocks/pass/config-exec.php'])],
+                [new Config([__DIR__ . '/mocks/pass/config.ini'])],
+                [new Config([__DIR__ . '/mocks/pass/config.json'])],
+                [new Config([__DIR__ . '/mocks/pass/config.php'])],
+                [new Config([__DIR__ . '/mocks/pass/config.toml'])],
+                [new Config([__DIR__ . '/mocks/pass/config.yaml'])]
             ]
         );
     }
@@ -368,7 +378,7 @@ class ConfigTest extends TestCase
                 3,
             ],
             [
-                new Config(__DIR__ . '/mocks/dir/'),
+                new Config([__DIR__ . '/mocks/dir/']),
                 4,
             ],
         ];

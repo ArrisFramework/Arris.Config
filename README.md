@@ -51,11 +51,17 @@ $config->get('database.port'); // 3306
 
 Файлы загружаются поверх значений по умолчанию. Если файла с `?` нет — ничего не ломается, он просто пропускается.
 
-Можно передать один файл строкой или директорию:
+Можно передать несколько файлов или директорию:
 
 ```php
-$config = new AppConfig('config.yaml', $defaults);
-$config = new AppConfig(__DIR__ . '/config', $defaults);
+$config = new AppConfig(['config.yaml'], $defaults);
+$config = new AppConfig([__DIR__ . '/config'], $defaults);
+```
+
+Для одного файла есть короткий хелпер:
+
+```php
+$config = AppConfig::fromFile('config.yaml', $defaults);
 ```
 
 Можно собрать конфиг из строки:
@@ -175,9 +181,10 @@ $config->remove('app.debug');
 ```php
 use Arris\Core\Config\Config;
 
-$config = new Config('config.json');
+$config = new Config(['config.json']);
 $config = Config::load(['config.php', '?config.local.php']);
-$config = new Config(__DIR__ . '/config');
+$config = Config::fromFile('config.json');
+$config = new Config([__DIR__ . '/config']);
 ```
 
 Из строки:

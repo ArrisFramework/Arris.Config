@@ -14,18 +14,30 @@ use Arris\Core\Config\Parser\ParserInterface;
 class AppConfig extends AbstractConfig
 {
     /**
-     * @param string|array $files Filename(s) or a directory
+     * @param array $files Filename(s) or a directory
      * @param array $defaults Defaults; files are patches on top of them
      *
      * @throws UnsupportedFormatException
      * @throws FileNotFoundException
      * @throws EmptyDirectoryException
      */
-    public function __construct(string|array $files = [], array $defaults = [])
+    public function __construct(array $files = [], array $defaults = [])
     {
         $loaded = (new Config($files))->all();
         $this->data = KeyPath::mergePatch($defaults, $loaded);
         $this->cache = [];
+    }
+
+    /**
+     * Builds an AppConfig from a single file.
+     *
+     * @throws UnsupportedFormatException
+     * @throws FileNotFoundException
+     * @throws EmptyDirectoryException
+     */
+    public static function fromFile(string $file, array $defaults = []): static
+    {
+        return new static([$file], $defaults);
     }
 
     /**
