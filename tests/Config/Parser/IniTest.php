@@ -66,6 +66,20 @@ class IniTest extends TestCase
     }
 
     /**
+     * @covers \Arris\Core\Config\Parser\Ini::parseString()
+     * @covers \Arris\Core\Config\Parser\Ini::parse()
+     */
+    public function testEmptyIniDoesNotReusePreviousError()
+    {
+        @trigger_error('stale warning from host', E_USER_WARNING);
+
+        $this->expectException(\Arris\Core\Config\Exception\ParseException::class);
+        $this->expectExceptionMessage('No parsable content');
+
+        $this->ini->parseString('');
+    }
+
+    /**
      * @covers \Arris\Core\Config\Parser\Ini::parseFile()
      * @covers \Arris\Core\Config\Parser\Ini::parseString()
      * @covers \Arris\Core\Config\Parser\Ini::parse()
@@ -86,21 +100,20 @@ class IniTest extends TestCase
      * @covers \Arris\Core\Config\Parser\Ini::parseFile()
      * @covers \Arris\Core\Config\Parser\Ini::parseString()
      * @covers \Arris\Core\Config\Parser\Ini::parse()
-     * @covers \Arris\Core\Config\Parser\Ini::expandDottedKey()
      */
     public function testLoadIniWithDottedName()
     {
         $file = $this->ini->parseFile(__DIR__ . '/../mocks/pass/config2.ini');
         $string = $this->ini->parseString(file_get_contents(__DIR__ . '/../mocks/pass/config2.ini'));
 
-        $expected = ['host1', 'host2', 'host3'];
+        // The parser returns raw keys; expanding dots is Config's job.
+        $this->assertSame('localhost', $file['network.http.host']);
+        $this->assertSame('80', $file['network.http.port']);
+        $this->assertSame(['host1', 'host2', 'host3'], $file['network.group.servers']);
+        $this->assertSame('configuration', $file['application']['name']);
 
-        $this->assertSame($expected, $file['network']['group']['servers']);
-        $this->assertSame('localhost', $file['network']['http']['host']);
-        $this->assertSame('80', $file['network']['http']['port']);
-
-        $this->assertSame($expected, $string['network']['group']['servers']);
-        $this->assertSame('localhost', $string['network']['http']['host']);
-        $this->assertSame('80', $string['network']['http']['port']);
+        $this->assertSame('localhost', $string['network.http.host']);
+        $this->assertSame('80', $string['network.http.port']);
+        $this->assertSame(['host1', 'host2', 'host3'], $string['network.group.servers']);
     }
 }

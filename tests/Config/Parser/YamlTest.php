@@ -41,7 +41,7 @@ class YamlTest extends TestCase
     public function testLoadInvalidYamlFile()
     {
         $this->expectException(\Arris\Core\Config\Exception\ParseException::class);
-        $this->expectExceptionMessage('Error parsing YAML file');
+        $this->expectExceptionMessage('Error parsing YAML string');
         $this->yaml->parseFile(__DIR__ . '/../mocks/fail/error.yaml');
     }
 

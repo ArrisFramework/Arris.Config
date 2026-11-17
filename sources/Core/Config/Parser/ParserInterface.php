@@ -11,6 +11,12 @@ namespace Arris\Core\Config\Parser;
 interface ParserInterface
 {
     /**
+     * Parsers must be constructible without arguments: Config instantiates
+     * every parser via `new $class()`.
+     */
+    public function __construct();
+
+    /**
      * Parses a configuration from file `$filename` and gets its contents as an array
      *
      * @param  string $filename

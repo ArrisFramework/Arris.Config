@@ -4,7 +4,6 @@ namespace Tests\Config;
 
 use Arris\Core\Config\Config;
 use Arris\Core\Config\Parser\Json as JsonParser;
-use Arris\Core\Config\Writer\Json as JsonWriter;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -46,7 +45,6 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithInvalidPath()
@@ -60,7 +58,6 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithEmptyDirectory()
@@ -73,12 +70,11 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithArray()
     {
-        $paths = [__DIR__ . '/mocks/pass/config.xml', __DIR__ . '/mocks/pass/config2.json'];
+        $paths = [__DIR__ . '/mocks/pass/config.json', __DIR__ . '/mocks/pass/config2.json'];
         $config = new Config($paths);
 
         $expected = 'localhost';
@@ -91,13 +87,12 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithArrayWithNonexistentFile()
     {
         $this->expectException(\Arris\Core\Config\Exception\FileNotFoundException::class);
-        $paths = [__DIR__ . '/mocks/pass/config.xml', __DIR__ . '/mocks/pass/config3.json'];
+        $paths = [__DIR__ . '/mocks/pass/config.json', __DIR__ . '/mocks/pass/config3.json'];
         $config = new Config($paths);
 
         $expected = 'localhost';
@@ -110,12 +105,11 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithArrayWithOptionalFile()
     {
-        $paths = [__DIR__ . '/mocks/pass/config.xml', '?' . __DIR__ . '/mocks/pass/config2.json'];
+        $paths = [__DIR__ . '/mocks/pass/config.json', '?' . __DIR__ . '/mocks/pass/config2.json'];
         $config = new Config($paths);
 
         $expected = 'localhost';
@@ -128,12 +122,11 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithArrayWithOptionalNonexistentFile()
     {
-        $paths = [__DIR__ . '/mocks/pass/config.xml', '?' . __DIR__ . '/mocks/pass/config3.json'];
+        $paths = [__DIR__ . '/mocks/pass/config.json', '?' . __DIR__ . '/mocks/pass/config3.json'];
         $config = new Config($paths);
 
         $expected = 'localhost';
@@ -146,7 +139,6 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithDirectory()
@@ -163,7 +155,6 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithYml()
@@ -180,24 +171,6 @@ class ConfigTest extends TestCase
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
      * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
-     * @covers Config::getValidPath()
-     */
-    public function testConstructWithYmlDist()
-    {
-        $config = new Config(__DIR__ . '/mocks/pass/config.yml.dist');
-
-        $expected = 'localhost';
-        $actual   = $config->get('host');
-
-        $this->assertSame($expected, $actual);
-    }
-
-    /**
-     * @covers Config::__construct()
-     * @covers Config::loadFromFile()
-     * @covers Config::getParser()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithEmptyYml()
@@ -213,7 +186,6 @@ class ConfigTest extends TestCase
     /**
      * @covers Config::__construct()
      * @covers Config::loadFromFile()
-     * @covers Config::getPathFromArray()
      * @covers Config::getValidPath()
      */
     public function testConstructWithFileParser()
@@ -227,13 +199,12 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @covers Config::__construct()
-     * @covers Config::loadFromString()
+     * @covers Config::fromString()
      */
     public function testConstructWithStringParser()
     {
         $settings = file_get_contents(__DIR__ . '/mocks/pass/config.php');
-        $config = new Config($settings, new \Arris\Core\Config\Parser\Php, true);
+        $config = Config::fromString($settings, new \Arris\Core\Config\Parser\Php());
 
         $expected = 'localhost';
         $actual   = $config->get('host');
@@ -246,41 +217,116 @@ class ConfigTest extends TestCase
      * @covers Config::get()
      * @dataProvider specialConfigProvider()
      */
-    public function testGetReturnsArrayMergedArray($config)
+    public function testGetReturnsArrayMergedArray($config, int $expectedCount)
     {
-        $this->assertCount(4, $config->get('servers'));
+        $this->assertCount($expectedCount, $config->get('servers'));
     }
 
     /**
-     * @covers Config::toFile()
-     * @covers Config::getWriter()
+     * @covers Config::loadFromFile()
+     * @covers Config::getValidPath()
      */
-    public function testWritesToFile()
+    public function testDottedKeysStayLiteral()
     {
-        $config = new Config(json_encode(['foo' => 'bar']), new JsonParser(), true);
-        $filename = tempnam(sys_get_temp_dir(), 'config').'.json';
+        $config = new Config(__DIR__ . '/mocks/pass/config2.ini');
 
-        $config->toFile($filename);
+        $this->assertSame('localhost', $config->get('network\\.http\\.host'));
+        $this->assertSame('80', $config->get('network\\.http\\.port'));
+        $this->assertSame(['host1', 'host2', 'host3'], $config->get('network\\.group\\.servers'));
+        $this->assertNull($config->get('network.http.host'));
 
-        $this->assertFileExists($filename);
+        // Sections are native INI nesting and still work.
+        $this->assertSame('configuration', $config->get('application.name'));
     }
 
     /**
-     * @covers Config::toString()
+     * @covers Config::fromString()
      */
-    public function testWritesToString()
+    public function testEscapedDotIsLiteralKey()
     {
-        $config = new Config(json_encode(['foo' => 'bar']), new JsonParser(), true);
+        $config = Config::fromString('{"a.b": 1}', new JsonParser());
 
-        $string = $config->toString(new JsonWriter());
+        $this->assertSame(1, $config->get('a\\.b'));
+        $this->assertNull($config->get('a.b'));
+        $this->assertArrayHasKey('a.b', $config->all());
+    }
 
-        $this->assertNotEmpty($string);
+    /**
+     * @covers Config::getValidPath()
+     */
+    public function testArrayPathMustContainStrings()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\FileNotFoundException::class);
+
+        new Config([['a']]);
+    }
+
+    /**
+     * @covers Config::getValidPath()
+     */
+    public function testDirectoryLoadingIgnoresSubdirectories()
+    {
+        $dir = sys_get_temp_dir() . '/arris_cfg_' . bin2hex(random_bytes(6));
+        mkdir($dir . '/nested.dir', 0777, true);
+        file_put_contents($dir . '/config.json', '{"host":"localhost"}');
+
+        try {
+            $config = new Config($dir);
+            $this->assertSame('localhost', $config->get('host'));
+        } finally {
+            unlink($dir . '/config.json');
+            rmdir($dir . '/nested.dir');
+            rmdir($dir);
+        }
+    }
+
+    /**
+     * @covers Config::getValidPath()
+     * @covers Config::getExtension()
+     */
+    public function testDirectorySkipsUnsupportedFilesAndNormalizesExtensionCase()
+    {
+        $dir = sys_get_temp_dir() . '/arris_cfg_' . bin2hex(random_bytes(6));
+        mkdir($dir, 0777, true);
+        file_put_contents($dir . '/CONFIG.JSON', '{"host":"localhost"}');
+        file_put_contents($dir . '/config.json.bak', '{"host":"backup"}');
+        file_put_contents($dir . '/config.yaml.dist', "host: ignored\n");
+        file_put_contents($dir . '/README.md', '# not a config');
+
+        try {
+            $config = new Config($dir);
+            $this->assertSame('localhost', $config->get('host'));
+        } finally {
+            unlink($dir . '/CONFIG.JSON');
+            unlink($dir . '/config.json.bak');
+            unlink($dir . '/config.yaml.dist');
+            unlink($dir . '/README.md');
+            rmdir($dir);
+        }
+    }
+
+    /**
+     * @covers Config::getValidPath()
+     */
+    public function testCustomParserLoadsDirectoryWithoutExtensionFilter()
+    {
+        $dir = sys_get_temp_dir() . '/arris_cfg_' . bin2hex(random_bytes(6));
+        mkdir($dir, 0777, true);
+        file_put_contents($dir . '/config.weird', '{"host":"localhost"}');
+
+        try {
+            $config = new Config($dir, new JsonParser());
+            $this->assertSame('localhost', $config->get('host'));
+        } finally {
+            unlink($dir . '/config.weird');
+            rmdir($dir);
+        }
     }
 
     /**
      * Provides names of example configuration files
      */
-    public function configProvider()
+    public static function configProvider()
     {
         return array_merge(
             [
@@ -288,7 +334,7 @@ class ConfigTest extends TestCase
                 [new Config(__DIR__ . '/mocks/pass/config.ini')],
                 [new Config(__DIR__ . '/mocks/pass/config.json')],
                 [new Config(__DIR__ . '/mocks/pass/config.php')],
-                [new Config(__DIR__ . '/mocks/pass/config.xml')],
+                [new Config(__DIR__ . '/mocks/pass/config.toml')],
                 [new Config(__DIR__ . '/mocks/pass/config.yaml')]
             ]
         );
@@ -297,7 +343,7 @@ class ConfigTest extends TestCase
     /**
      * Provides names of example configuration files (for array and directory)
      */
-    public function specialConfigProvider()
+    public static function specialConfigProvider()
     {
         return [
             [
@@ -307,8 +353,12 @@ class ConfigTest extends TestCase
                         __DIR__ . '/mocks/pass/config.yaml'
                     ]
                 ),
-                new Config(__DIR__ . '/mocks/dir/')
-            ]
+                3,
+            ],
+            [
+                new Config(__DIR__ . '/mocks/dir/'),
+                4,
+            ],
         ];
     }
 }

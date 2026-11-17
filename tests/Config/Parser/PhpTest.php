@@ -103,6 +103,19 @@ class PhpTest extends TestCase
     }
 
     /**
+     * @covers \Arris\Core\Config\Parser\Php::parseString()
+     * @covers \Arris\Core\Config\Parser\Php::isolate()
+     * @covers \Arris\Core\Config\Parser\Php::parse()
+     */
+    public function testLoadThrowingClosureString()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\ParseException::class);
+        $this->expectExceptionMessage('PHP string threw an exception');
+
+        $this->php->parseString('<?php return function () { throw new \RuntimeException("boom"); };');
+    }
+
+    /**
      * @covers \Arris\Core\Config\Parser\Php::parseFile()
      * @covers \Arris\Core\Config\Parser\Php::parseString()
      * @covers \Arris\Core\Config\Parser\Php::isolate()

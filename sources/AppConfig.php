@@ -8,64 +8,50 @@ use Arris\Core\Config\Config;
 use Arris\Core\Config\Exception\EmptyDirectoryException;
 use Arris\Core\Config\Exception\FileNotFoundException;
 use Arris\Core\Config\Exception\UnsupportedFormatException;
+use Arris\Core\Config\KeyPath;
+use Arris\Core\Config\Parser\ParserInterface;
 
 class AppConfig extends AbstractConfig
 {
-    private static array $instances = [];
-
     /**
+     * @param string|array $files Filename(s) or a directory
+     * @param array $defaults Defaults; files are patches on top of them
+     *
      * @throws UnsupportedFormatException
      * @throws FileNotFoundException
      * @throws EmptyDirectoryException
      */
-    public function __construct(array $files = [], array $defaults = [])
+    public function __construct(string|array $files = [], array $defaults = [])
     {
-        parent::__construct($files);
-
-        // Читаем файлы с диска
-        $loadedData = (new Config($files))->data;
-
-        // Сливаем дефолты конкретного App с загруженными файлами
-        $this->data = self::arrayMergeRecursiveReplace($defaults, $loadedData);
-    }
-
-    protected static function arrayMergeRecursiveReplace(array $original, array $patch): array
-    {
-        foreach ($patch as $key => $value) {
-            if ($value === null) {
-                unset($original[$key]);
-            } elseif (is_array($value) && isset($original[$key]) && is_array($original[$key])) {
-                $original[$key] = self::arrayMergeRecursiveReplace($original[$key], $value);
-            } else {
-                $original[$key] = $value;
-            }
-        }
-        return $original;
+        $loaded = (new Config($files))->all();
+        $this->data = KeyPath::mergePatch($defaults, $loaded);
+        $this->cache = [];
     }
 
     /**
-     * Добавляет массив конфигурации к существующим данным.
-     * Используется для динамического расширения конфига.
-     *
-     * @param array $config Массив для слияния
-     * @return self
+     * Builds an AppConfig from a configuration string.
+     * The parser is required; null in the string deletes a default key.
+     */
+    public static function fromString(
+        string $configuration,
+        ParserInterface $parser,
+        array $defaults = []
+    ): static {
+        $config = new static();
+        $config->data = KeyPath::mergePatch($defaults, $parser->parseString($configuration));
+        $config->cache = [];
+
+        return $config;
+    }
+
+    /**
+     * Adds a configuration layer to the existing data.
      */
     public function add(array $config): self
     {
-        $this->data = self::arrayMergeRecursiveReplace($this->data, $config);
-        return $this;
-    }
-
-    /**
-     * Заменяет данные конфига целиком.
-     *
-     * @param array $config Новый массив конфигурации
-     * @return self
-     */
-    public function replace(array $config): self
-    {
-        $this->data = $config;
+        $this->data = KeyPath::mergePatch($this->data ?? [], $config);
         $this->cache = [];
+
         return $this;
     }
 }

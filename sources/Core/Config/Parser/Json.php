@@ -12,6 +12,10 @@ use Arris\Core\Config\Exception\ParseException;
  */
 class Json implements ParserInterface
 {
+    public function __construct()
+    {
+    }
+
     /**
      * {@inheritDoc}
      * Parses an JSON file as an array
@@ -20,9 +24,16 @@ class Json implements ParserInterface
      */
     public function parseFile($filename)
     {
-        $data = json_decode(file_get_contents($filename), true);
+        $contents = @file_get_contents($filename);
 
-        return (array)$this->parse($data, $filename);
+        if ($contents === false) {
+            throw new ParseException([
+                'message' => 'Unable to read configuration file',
+                'file'    => $filename,
+            ]);
+        }
+
+        return $this->parseString($contents);
     }
 
     /**

@@ -13,6 +13,10 @@ use Arris\Core\Config\Exception\UnsupportedFormatException;
  */
 class Php implements ParserInterface
 {
+    public function __construct()
+    {
+    }
+
     /**
      * {@inheritDoc}
      * Loads a PHP file and gets its' contents as an array
@@ -22,9 +26,11 @@ class Php implements ParserInterface
      */
     public function parseFile($filename)
     {
-        // Run the fileEval the string, if it throws an exception, rethrow it
         try {
             $data = require $filename;
+            return (array)$this->parse($data, $filename);
+        } catch (ParseException|UnsupportedFormatException $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
             throw new ParseException(
                 [
@@ -33,9 +39,6 @@ class Php implements ParserInterface
                 ]
             );
         }
-
-        // Complete parsing
-        return (array)$this->parse($data, $filename);
     }
 
     /**
@@ -53,9 +56,11 @@ class Php implements ParserInterface
             $config = '?>' . $config;
         }
 
-        // Eval the string, if it throws an exception, rethrow it
         try {
             $data = $this->isolate($config);
+            return (array)$this->parse($data);
+        } catch (ParseException|UnsupportedFormatException $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
             throw new ParseException(
                 [
@@ -64,9 +69,6 @@ class Php implements ParserInterface
                 ]
             );
         }
-
-        // Complete parsing
-        return (array)$this->parse($data);
     }
 
     /**
@@ -80,9 +82,9 @@ class Php implements ParserInterface
      */
     protected function parse($data = null, $filename = null)
     {
-        // If we have a callable, run it and expect an array back
-        if (is_callable($data)) {
-            $data = call_user_func($data);
+        // If we have a closure, run it and expect an array back
+        if ($data instanceof \Closure) {
+            $data = $data();
         }
 
         // Check for array, if It's anything else, throw an exception

@@ -1,6 +1,6 @@
 {
     "name": "karelwintersky/arris.config",
-    "description": "Arris µFramework: Config reader/writer and AppConfig",
+    "description": "Arris µFramework: read-only config reader and AppConfig",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -16,18 +16,17 @@
         "sort-packages": true
     },
     "require": {
-        "php": "^8.2",
-        "ext-dom": "*",
-        "ext-simplexml": "*",
-        "ext-libxml": "*"
+        "php": "^8.2"
     },
     "require-dev": {
+        "internal/toml": "^1.1",
         "phpunit/phpunit": "^10",
-        "symfony/yaml": "^5.4"
+        "symfony/yaml": "^5.4 || ^6.4 || ^7.0"
     },
     "suggest": {
         "karelwintersky/arris": "Karel Wintersky's Application µFramework",
-        "symfony/yaml": "Required to read/write YAML configs"
+        "internal/toml": "Required to read TOML configs",
+        "symfony/yaml": "Required to read YAML configs"
     },
     "autoload": {
         "psr-4": {

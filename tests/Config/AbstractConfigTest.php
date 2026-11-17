@@ -213,8 +213,10 @@ class AbstractConfigTest extends TestCase
 
     /**
      * @covers AbstractConfig::set()
+     * @covers AbstractConfig::remove()
+     * @covers AbstractConfig::replace()
      */
-    public function testSetAndUnsetArray()
+    public function testRemoveAndReplaceNull()
     {
         $this->config->set('database', [
             'host' => 'localhost',
@@ -222,9 +224,13 @@ class AbstractConfigTest extends TestCase
         ]);
         $this->assertIsArray($this->config->get('database'));
         $this->assertSame('localhost', $this->config->get('database.host'));
-        $this->config->set('database.host', null);
+
+        $this->config->remove('database.host');
+        $this->assertFalse($this->config->has('database.host'));
         $this->assertNull($this->config->get('database.host'));
-        $this->config->set('database', null);
+
+        $this->config->replace('database', null);
+        $this->assertTrue($this->config->has('database'));
         $this->assertNull($this->config->get('database'));
     }
 
@@ -506,5 +512,337 @@ class AbstractConfigTest extends TestCase
     {
         $this->config->remove('application');
         $this->assertNull($this->config['application']);
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetScalarThenChildThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a', 'bar');
+        $config->set('a.b', 'foo');
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetArrayThenScalarThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a.b', 'foo');
+        $config->set('a', 'bar');
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetAssocDeepMerges()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => 1]);
+        $config->set('a', ['c' => 2]);
+
+        $this->assertSame(['b' => 1, 'c' => 2], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetListReplaces()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', ['h1', 'h2', 'h3']);
+        $config->set('a', ['h4']);
+
+        $this->assertSame(['h4'], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetKindMismatchThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => 1]);
+        $config->set('a', ['h1']);
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetEmptyArrayClearsArray()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => 1]);
+        $config->set('a', []);
+
+        $this->assertSame([], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetNullThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\InvalidValueException::class);
+
+        $config = new SimpleConfig(['a' => ['b' => 1]]);
+        $config->set('a.b', null);
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetNullInsideArrayThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\InvalidValueException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => null]);
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     * @covers AbstractConfig::get()
+     */
+    public function testEscapedDotAddressesLiteralKey()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a\\.b', 1);
+
+        $this->assertSame(1, $config->get('a\\.b'));
+        $this->assertNull($config->get('a.b'));
+        $this->assertArrayHasKey('a.b', $config->all());
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplaceNodeChangesKind()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a.b', 'foo');
+        $config->replace('a', 'bar');
+
+        $this->assertSame('bar', $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplaceNodeWithArrayReplacesNotMerges()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => 1]);
+        $config->replace('a', ['c' => 2]);
+
+        $this->assertSame(['c' => 2], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplacePathAcceptsNull()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', ['b' => 1]);
+        $config->replace('a', null);
+
+        $this->assertTrue($config->has('a'));
+        $this->assertNull($config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplaceWholeConfig()
+    {
+        $config = new SimpleConfig(['a' => 1]);
+        $config->replace(['b' => 2]);
+
+        $this->assertNull($config->get('a'));
+        $this->assertSame(2, $config->get('b'));
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplacePathRequiresValue()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        (new SimpleConfig([]))->replace('a');
+    }
+
+    /**
+     * @covers AbstractConfig::merge()
+     */
+    public function testLayerMergeReplacesLists()
+    {
+        $config = new SimpleConfig(['servers' => ['h1', 'h2', 'h3']]);
+        $config->merge(new SimpleConfig(['servers' => ['h4']]));
+
+        $this->assertSame(['h4'], $config->get('servers'));
+    }
+
+    /**
+     * @covers AbstractConfig::merge()
+     */
+    public function testLayerMergeNullDeletes()
+    {
+        $config = new SimpleConfig(['a' => 1]);
+        $config->merge(new SimpleConfig(['a' => null]));
+
+        $this->assertFalse($config->has('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::__construct()
+     */
+    public function testDefaultsDeepMerge()
+    {
+        $config = new SimpleConfig(['application' => ['name' => 'custom']]);
+
+        $this->assertSame('custom', $config->get('application.name'));
+        $this->assertSame('s3cr3t', $config->get('application.secret'));
+    }
+
+    /**
+     * @covers AbstractConfig::remove()
+     * @covers AbstractConfig::has()
+     */
+    public function testRemoveInvalidatesNestedCache()
+    {
+        $config = new SimpleConfig(['a' => ['b' => 1]]);
+        $this->assertSame(1, $config->get('a.b'));
+
+        $config->remove('a');
+
+        $this->assertFalse($config->has('a.b'));
+        $this->assertNull($config->get('a.b'));
+    }
+
+    /**
+     * @covers AbstractConfig::offsetUnset()
+     */
+    public function testRemoveDoesNotAffectPrefixKeys()
+    {
+        $config = new SimpleConfig(['foo' => 1, 'foobar' => 2]);
+        $this->assertSame(2, $config->get('foobar'));
+
+        $config->remove('foo');
+
+        $this->assertSame(2, $config->get('foobar'));
+    }
+
+    /**
+     * @covers AbstractConfig::offsetSet()
+     */
+    public function testArrayAccessAppendThrows()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $config = new SimpleConfig([]);
+        $config[] = 5;
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetListElementReplaces()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('servers', ['h1', 'h2']);
+        $config->set('servers.0', 'h0');
+
+        $this->assertSame(['h0', 'h2'], $config->get('servers'));
+    }
+
+    /**
+     * @covers AbstractConfig::__construct()
+     */
+    public function testConstructorKeepsDottedKeysLiteral()
+    {
+        $config = new SimpleConfig(['a.b' => 1, 'a.c' => 2]);
+
+        $this->assertSame(1, $config->get('a\\.b'));
+        $this->assertSame(2, $config->get('a\\.c'));
+        $this->assertNull($config->get('a.b'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetScalarToEmptyArrayThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a', 'x');
+        $config->set('a', []);
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetListNonNumericSegmentThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('servers', ['h1']);
+        $config->set('servers.host', 'localhost');
+    }
+
+    /**
+     * @covers AbstractConfig::replace()
+     */
+    public function testReplaceIntermediateScalarThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig([]);
+        $config->set('a', 'x');
+        $config->replace('a.b', 'y');
+    }
+
+    /**
+     * @covers AbstractConfig::remove()
+     */
+    public function testRemoveOnlyChildLeavesEmptyArray()
+    {
+        $config = new SimpleConfig(['a' => ['b' => 1]]);
+        $config->remove('a.b');
+
+        $this->assertTrue($config->has('a'));
+        $this->assertSame([], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     * @covers AbstractConfig::get()
+     */
+    public function testLiteralAndNestedKeysCoexist()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a.b', 1);
+        $config->set('a\\.b', 2);
+
+        $this->assertSame(1, $config->get('a.b'));
+        $this->assertSame(2, $config->get('a\\.b'));
+
+        $config->set('x', $config->get('a'));
+        $config->set('y', ['b.c' => 3]);
+
+        $this->assertSame(['b' => 1], $config->get('x'));
+        $this->assertSame(3, $config->get('y.b\\.c'));
+        $this->assertNull($config->get('y.b.c'));
     }
 }

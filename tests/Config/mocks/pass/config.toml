@@ -1,0 +1,6 @@
+host = "localhost"
+port = 80
+
+[application]
+name = "configuration"
+secret = "s3cr3t"

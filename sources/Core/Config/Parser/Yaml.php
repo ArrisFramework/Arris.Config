@@ -1,73 +1,57 @@
 <?php
+declare(strict_types=1);
 
 namespace Arris\Core\Config\Parser;
 
-use Exception;
-use Symfony\Component\Yaml\Yaml as YamlParser;
 use Arris\Core\Config\Exception\ParseException;
+use Arris\Core\Config\Exception\UnsupportedFormatException;
+use Symfony\Component\Yaml\Yaml as YamlParser;
+use Throwable;
 
 /**
- * YAML parser
- *
- * @package    Config
- * @license    MIT
+ * YAML parser.
  */
 class Yaml implements ParserInterface
 {
-    /**
-     * {@inheritDoc}
-     * Loads a YAML/YML file as an array
-     *
-     * @throws ParseException If there is an error parsing the YAML file
-     */
-    public function parseFile($filename)
+    public function __construct()
     {
-        try {
-            $data = YamlParser::parseFile($filename, YamlParser::PARSE_CONSTANT);
-        } catch (Exception $exception) {
-            throw new ParseException(
-                [
-                    'message'   => 'Error parsing YAML file',
-                    'exception' => $exception,
-                ]
-            );
+        if (!class_exists(YamlParser::class)) {
+            throw new UnsupportedFormatException('YAML support requires the symfony/yaml package');
         }
-
-        return (array)$this->parse($data);
     }
 
     /**
      * {@inheritDoc}
-     * Loads a YAML/YML string as an array
-     *
-     * @throws ParseException If If there is an error parsing the YAML string
+     */
+    public function parseFile($filename)
+    {
+        $contents = @file_get_contents($filename);
+
+        if ($contents === false) {
+            throw new ParseException([
+                'message' => 'Unable to read configuration file',
+                'file'    => $filename,
+            ]);
+        }
+
+        return $this->parseString($contents);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public function parseString($config)
     {
         try {
             $data = YamlParser::parse($config, YamlParser::PARSE_CONSTANT);
-        } catch (Exception $exception) {
-            throw new ParseException(
-                [
-                    'message'   => 'Error parsing YAML string',
-                    'exception' => $exception,
-                ]
-            );
+        } catch (Throwable $exception) {
+            throw new ParseException([
+                'message'   => 'Error parsing YAML string',
+                'exception' => $exception,
+            ]);
         }
 
-        return (array)$this->parse($data);
-    }
-
-    /**
-     * Completes parsing of YAML/YML data
-     *
-     * @param  array $data
-     *
-     * @return array|null
-     */
-    protected function parse($data = null)
-    {
-        return $data;
+        return (array)$data;
     }
 
     /**
