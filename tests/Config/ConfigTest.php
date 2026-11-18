@@ -63,7 +63,7 @@ class ConfigTest extends TestCase
     public function testConstructWithEmptyDirectory()
     {
         $this->expectException(\Arris\Core\Config\Exception\EmptyDirectoryException::class);
-        $config = new Config([__DIR__ . '/mocks/empty']);
+        $config = Config::fromDirectory(__DIR__ . '/mocks/empty');
     }
 
     /**
@@ -143,7 +143,7 @@ class ConfigTest extends TestCase
      */
     public function testConstructWithDirectory()
     {
-        $config = new Config([__DIR__ . '/mocks/dir']);
+        $config = Config::fromDirectory(__DIR__ . '/mocks/dir');
 
         $expected = 'localhost';
         $actual   = $config->get('host');
@@ -293,7 +293,7 @@ class ConfigTest extends TestCase
         file_put_contents($dir . '/config.json', '{"host":"localhost"}');
 
         try {
-            $config = new Config([$dir]);
+            $config = Config::fromDirectory($dir);
             $this->assertSame('localhost', $config->get('host'));
         } finally {
             unlink($dir . '/config.json');
@@ -316,7 +316,7 @@ class ConfigTest extends TestCase
         file_put_contents($dir . '/README.md', '# not a config');
 
         try {
-            $config = new Config([$dir]);
+            $config = Config::fromDirectory($dir);
             $this->assertSame('localhost', $config->get('host'));
         } finally {
             unlink($dir . '/CONFIG.JSON');
@@ -328,20 +328,70 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @covers Config::resolveSources()
+     * @covers Config::fromDirectory()
      */
-    public function testCustomParserLoadsDirectoryWithoutExtensionFilter()
+    public function testCustomParserLoadsDirectoryOnlyMatchingExtensions()
     {
         $dir = sys_get_temp_dir() . '/arris_cfg_' . bin2hex(random_bytes(6));
         mkdir($dir, 0777, true);
-        file_put_contents($dir . '/config.weird', '{"host":"localhost"}');
+        file_put_contents($dir . '/config.json', '{"host":"localhost"}');
+        file_put_contents($dir . '/config.weird', '{"host":"ignored"}');
 
         try {
-            $config = new Config([$dir], new JsonParser());
+            $config = Config::fromDirectory($dir, new JsonParser());
             $this->assertSame('localhost', $config->get('host'));
         } finally {
+            unlink($dir . '/config.json');
             unlink($dir . '/config.weird');
             rmdir($dir);
+        }
+    }
+
+    /**
+     * @covers Config::fromDirectory()
+     */
+    public function testConstructorDoesNotLoadDirectories()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('use Config::fromDirectory()');
+
+        new Config([__DIR__ . '/mocks/dir']);
+    }
+
+    /**
+     * @covers Config::fromDirectory()
+     */
+    public function testFromDirectoryMissingDirectoryThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\FileNotFoundException::class);
+
+        Config::fromDirectory(__DIR__ . '/mocks/does-not-exist');
+    }
+
+    /**
+     * @covers Config::fromDirectory()
+     */
+    public function testFromDirectoryMissingDirectoryIsIgnored()
+    {
+        $config = Config::fromDirectory(__DIR__ . '/mocks/does-not-exist', null, true);
+
+        $this->assertSame([], $config->all());
+    }
+
+    /**
+     * @covers Config::resolveSources()
+     */
+    public function testExplicitBackupFileHasNoSpecialMeaning()
+    {
+        $file = sys_get_temp_dir() . '/arris_cfg_' . bin2hex(random_bytes(6)) . '.json.bak';
+        file_put_contents($file, '{"host":"localhost"}');
+
+        try {
+            $this->expectException(\Arris\Core\Config\Exception\UnsupportedFormatException::class);
+
+            new Config([$file]);
+        } finally {
+            @unlink($file);
         }
     }
 
@@ -378,7 +428,7 @@ class ConfigTest extends TestCase
                 3,
             ],
             [
-                new Config([__DIR__ . '/mocks/dir/']),
+                Config::fromDirectory(__DIR__ . '/mocks/dir/'),
                 4,
             ],
         ];

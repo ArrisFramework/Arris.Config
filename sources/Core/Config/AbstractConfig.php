@@ -4,8 +4,11 @@ declare(strict_types=1);
 namespace Arris\Core\Config;
 
 use ArrayAccess;
+use ArrayIterator;
 use InvalidArgumentException;
-use Iterator;
+use IteratorAggregate;
+use Traversable;
+use Arris\Core\Config\Exception\NotImplementedException;
 
 /**
  * Abstract Config class.
@@ -14,17 +17,12 @@ use Iterator;
  * expressions: `\.` addresses a literal dot in a data key. Data keys are
  * always literal; nothing is expanded on write.
  */
-abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
+abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorAggregate
 {
     /**
      * Stores the configuration data.
      */
     public ?array $data = null;
-
-    /**
-     * Caches resolved keys. Fully invalidated on every mutation.
-     */
-    protected array $cache = [];
 
     public function __construct(array $data = [])
     {
@@ -48,14 +46,28 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
     public function get($key, $default = null)
     {
         if ($key === '*') {
-            return $this->data ?? [];
+            return $this->getAll();
         }
 
-        if ($this->has($key)) {
-            return $this->cache[$key];
-        }
+        [$found, $value] = KeyPath::get($this->data ?? [], self::normalizeKey($key));
 
-        return $default;
+        return $found ? $value : $default;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getAll(): array
+    {
+        return $this->data ?? [];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getAllMatch(string $mask): array
+    {
+        throw new NotImplementedException('getAllMatch() is not implemented yet');
     }
 
     /**
@@ -67,9 +79,8 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
     public function set($key, $value): void
     {
         $data = $this->data ?? [];
-        KeyPath::set($data, (string)$key, $value);
+        KeyPath::set($data, self::normalizeKey($key), $value);
         $this->data = $data;
-        $this->cache = [];
     }
 
     /**
@@ -90,7 +101,6 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
             }
 
             $this->data = $target;
-            $this->cache = [];
 
             return $this;
         }
@@ -101,7 +111,6 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
 
         KeyPath::replace($data, $target, $value);
         $this->data = $data;
-        $this->cache = [];
 
         return $this;
     }
@@ -111,15 +120,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
      */
     public function has($key): bool
     {
-        if (array_key_exists($key, $this->cache)) {
-            return true;
-        }
-
-        [$found, $value] = KeyPath::get($this->data ?? [], (string)$key);
-
-        if ($found) {
-            $this->cache[$key] = $value;
-        }
+        [$found] = KeyPath::get($this->data ?? [], self::normalizeKey($key));
 
         return $found;
     }
@@ -130,7 +131,6 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
     public function merge(ConfigInterface $config): ConfigInterface
     {
         $this->data = KeyPath::mergePatch($this->data ?? [], $config->all());
-        $this->cache = [];
 
         return $this;
     }
@@ -141,6 +141,14 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
     public function all(): array
     {
         return $this->data ?? [];
+    }
+
+    /**
+     * Returns a fresh iterator over the configuration data.
+     */
+    public function getIterator(): Traversable
+    {
+        return new ArrayIterator($this->data ?? []);
     }
 
     /**
@@ -184,58 +192,21 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, Iterator
     }
 
     /**
-     * Returns the data array element referenced by its internal cursor.
-     */
-    #[\ReturnTypeWillChange]
-    public function current()
-    {
-        return (is_array($this->data) ? current($this->data) : null);
-    }
-
-    /**
-     * Returns the data array index referenced by its internal cursor.
-     */
-    #[\ReturnTypeWillChange]
-    public function key()
-    {
-        return (is_array($this->data) ? key($this->data) : null);
-    }
-
-    /**
-     * Moves the data array's internal cursor forward one element.
-     */
-    #[\ReturnTypeWillChange]
-    public function next()
-    {
-        return (is_array($this->data) ? next($this->data) : null);
-    }
-
-    /**
-     * Moves the data array's internal cursor to the first element.
-     */
-    #[\ReturnTypeWillChange]
-    public function rewind()
-    {
-        return (is_array($this->data) ? reset($this->data) : null);
-    }
-
-    /**
-     * Tests whether the iterator's current index is valid.
-     */
-    #[\ReturnTypeWillChange]
-    public function valid()
-    {
-        return (is_array($this->data) ? key($this->data) !== null : false);
-    }
-
-    /**
      * Remove a value using the offset as a key.
      */
     public function remove($key): void
     {
         $data = $this->data ?? [];
-        KeyPath::remove($data, (string)$key);
+        KeyPath::remove($data, self::normalizeKey($key));
         $this->data = $data;
-        $this->cache = [];
+    }
+
+    private static function normalizeKey(mixed $key): string
+    {
+        if (!is_string($key) && !is_int($key)) {
+            throw new InvalidArgumentException('Config keys must be strings or integers');
+        }
+
+        return (string)$key;
     }
 }

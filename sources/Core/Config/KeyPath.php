@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Arris\Core\Config;
 
-use Arris\Core\Config\Exception\InvalidValueException;
 use Arris\Core\Config\Exception\StructureConflictException;
 
 /**
@@ -78,14 +77,13 @@ final class KeyPath
     /**
      * Strict set: the kind of an existing node cannot change.
      *
-     * null is not a value here: use remove() to delete or replace() to store null.
+     * null is a normal value. Assigning null over a non-empty array/list is a
+     * kind change and throws; replace() can be used for an explicit replacement.
      *
-     * @throws StructureConflictException|InvalidValueException
+     * @throws StructureConflictException
      */
     public static function set(array &$data, string $path, mixed $value): void
     {
-        self::assertNoNulls($value, $path);
-
         $segments = self::segments($path);
         $last = array_pop($segments);
         $node = &$data;
@@ -182,6 +180,15 @@ final class KeyPath
     private static function setNode(mixed $existing, mixed $value, string $path): mixed
     {
         $existingKind = self::kind($existing);
+
+        if ($value === null) {
+            if ($existingKind === 'list' || $existingKind === 'assoc') {
+                throw self::conflict($path, $existingKind, 'null');
+            }
+
+            return null;
+        }
+
         $valueKind = self::kind($value);
 
         if ($existingKind === 'null' || $existingKind === 'empty') {
@@ -217,7 +224,7 @@ final class KeyPath
     }
 
     /**
-     * @throws StructureConflictException|InvalidValueException
+     * @throws StructureConflictException
      */
     private static function mergeStrict(array $base, array $patch, string $path): array
     {
@@ -225,7 +232,6 @@ final class KeyPath
             $childPath = $path === '' ? (string)$key : $path . '.' . $key;
 
             if (!array_key_exists($key, $base)) {
-                self::assertNoNulls($value, $childPath);
                 $base[$key] = $value;
                 continue;
             }
@@ -304,25 +310,6 @@ final class KeyPath
         }
 
         return $base;
-    }
-
-    private static function assertNoNulls(mixed $value, string $path): void
-    {
-        if ($value === null) {
-            throw new InvalidValueException(sprintf(
-                'Cannot set "%s" to null; use remove() to delete or replace() to store null.',
-                $path
-            ));
-        }
-
-        if (!is_array($value)) {
-            return;
-        }
-
-        foreach ($value as $key => $item) {
-            $childPath = $path === '' ? (string)$key : $path . '.' . $key;
-            self::assertNoNulls($item, $childPath);
-        }
     }
 
     private static function conflict(string $path, string $existingKind, string $newKind): StructureConflictException

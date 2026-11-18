@@ -86,4 +86,23 @@ class YamlTest extends TestCase
         $this->assertSame('localhost', $actual['host']);
         $this->assertSame(80, $actual['port']);
     }
+
+    public function testLoadScalarYamlThrowsInvalidConfig()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\InvalidConfigException::class);
+
+        $this->yaml->parseString('foo');
+    }
+
+    public function testLoadNullYamlThrowsInvalidConfig()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\InvalidConfigException::class);
+
+        $this->yaml->parseString('null');
+    }
+
+    public function testLoadEmptyYamlReturnsEmptyArray()
+    {
+        $this->assertSame([], $this->yaml->parseString(''));
+    }
 }

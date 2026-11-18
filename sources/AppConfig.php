@@ -5,27 +5,24 @@ namespace Arris;
 
 use Arris\Core\Config\AbstractConfig;
 use Arris\Core\Config\Config;
-use Arris\Core\Config\Exception\EmptyDirectoryException;
 use Arris\Core\Config\Exception\FileNotFoundException;
 use Arris\Core\Config\Exception\UnsupportedFormatException;
 use Arris\Core\Config\KeyPath;
 use Arris\Core\Config\Parser\ParserInterface;
 
-class AppConfig extends AbstractConfig
+final class AppConfig extends AbstractConfig
 {
     /**
-     * @param array $files Filename(s) or a directory
+     * @param array $files Explicit filename(s)
      * @param array $defaults Defaults; files are patches on top of them
      *
      * @throws UnsupportedFormatException
      * @throws FileNotFoundException
-     * @throws EmptyDirectoryException
      */
     public function __construct(array $files = [], array $defaults = [])
     {
         $loaded = (new Config($files))->all();
         $this->data = KeyPath::mergePatch($defaults, $loaded);
-        $this->cache = [];
     }
 
     /**
@@ -33,11 +30,10 @@ class AppConfig extends AbstractConfig
      *
      * @throws UnsupportedFormatException
      * @throws FileNotFoundException
-     * @throws EmptyDirectoryException
      */
-    public static function fromFile(string $file, array $defaults = []): static
+    public static function fromFile(string $file, array $defaults = []): self
     {
-        return new static([$file], $defaults);
+        return new self([$file], $defaults);
     }
 
     /**
@@ -48,10 +44,9 @@ class AppConfig extends AbstractConfig
         string $configuration,
         ParserInterface $parser,
         array $defaults = []
-    ): static {
-        $config = new static();
+    ): self {
+        $config = new self();
         $config->data = KeyPath::mergePatch($defaults, $parser->parseString($configuration));
-        $config->cache = [];
 
         return $config;
     }
@@ -62,7 +57,6 @@ class AppConfig extends AbstractConfig
     public function add(array $config): self
     {
         $this->data = KeyPath::mergePatch($this->data ?? [], $config);
-        $this->cache = [];
 
         return $this;
     }

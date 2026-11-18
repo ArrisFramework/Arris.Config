@@ -51,11 +51,11 @@ $config->get('database.port'); // 3306
 
 Файлы загружаются поверх значений по умолчанию. Если файла с `?` нет — ничего не ломается, он просто пропускается.
 
-Можно передать несколько файлов или директорию:
+Можно передать несколько файлов:
 
 ```php
 $config = new AppConfig(['config.yaml'], $defaults);
-$config = new AppConfig([__DIR__ . '/config'], $defaults);
+$config = new AppConfig(['base.yaml', '?local.yaml'], $defaults);
 ```
 
 Для одного файла есть короткий хелпер:
@@ -63,6 +63,8 @@ $config = new AppConfig([__DIR__ . '/config'], $defaults);
 ```php
 $config = AppConfig::fromFile('config.yaml', $defaults);
 ```
+
+Директории автоматически больше не сканируются. Для истории остался deprecated-метод `Config::fromDirectory()`, но надёжнее перечислить файлы явно.
 
 Можно собрать конфиг из строки:
 
@@ -147,7 +149,7 @@ $config->remove('app');
 $config->set('app.debug', true);
 ```
 
-`null` в `set()` использовать нельзя — для удаления есть `remove()`, для записи `null` — `replace()`.
+`null` — обычное значение. `set('app', ['debug' => null])` допустим. Но `set()` не сужает структуру: если узел уже непустой массив/список, `set($path, null)` бросит `StructureConflictException`. Для явной замены ветки на `null` используйте `replace($path, null)`. Для удаления — `remove()`.
 
 ### `replace()` — явная замена
 
@@ -184,7 +186,6 @@ use Arris\Core\Config\Config;
 $config = new Config(['config.json']);
 $config = Config::load(['config.php', '?config.local.php']);
 $config = Config::fromFile('config.json');
-$config = new Config([__DIR__ . '/config']);
 ```
 
 Из строки:
@@ -199,19 +200,13 @@ $config = Config::fromString($yaml, new Yaml());
 $config = Config::fromString($toml, new Toml());
 ```
 
-### Директории
+### Директории (deprecated)
 
-Из директории загружаются только файлы поддерживаемых форматов.
+Автоматического «прочитай каталог» нет: конструктор и `load()` принимают только явные файлы.
 
-- файлы сортируются по имени;
-- `.bak`-файлы пропускаются;
-- `.dist` не поддерживается;
-- файлы с неподдерживаемым расширением пропускаются;
-- поддиректории не загружаются;
-- скрытые файлы пропускаются;
-- расширение можно писать в любом регистре (`.JSON` тоже подойдёт).
+Для истории оставлен `Config::fromDirectory($directory)` — **deprecated**. Он сканирует директорию, сортирует файлы, пропускает `.bak`, скрытые файлы, поддиректории и неподдерживаемые расширения. Расширение можно писать в любом регистре. Для нового кода используйте явный список файлов.
 
-Список источников — это плоский массив строк. Вложенные массивы и glob-паттерны (`*.yaml`, `**/*.yaml`) не поддерживаются.
+Список источников — плоский массив строк. Вложенные массивы и glob-паттерны (`*.yaml`, `**/*.yaml`) не поддерживаются.
 
 ### INI
 
@@ -231,11 +226,15 @@ $config->get('application.name');      // configuration
 
 ## Слияние и `all()`
 
-`all()` возвращает весь конфиг массивом.
+`all()`, `getAll()` и `get('*')` возвращают весь конфиг массивом.
 
 ```php
 $all = $config->all();
+$all = $config->getAll();
+$all = $config->get('*');
 ```
+
+`getAllMatch($mask)` зарезервирован и пока кидает `NotImplementedException`.
 
 Если нужно получить точную копию:
 
@@ -249,7 +248,8 @@ $copy->replace($all);
 ## Исключения
 
 - `StructureConflictException` — попытка изменить тип узла через `set()`.
-- `InvalidValueException` — `null` в `set()`.
+- `InvalidConfigException` — JSON/YAML с корнем-скаляром вместо объекта/массива.
+- `NotImplementedException` — зарезервированный метод (`getAllMatch()`).
 - `FileNotFoundException` — файл не найден.
 - `EmptyDirectoryException` — директория пустая или в ней нет подходящих файлов.
 - `UnsupportedFormatException` — неизвестный формат.

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Arris\Core\Config\Parser;
 
+use Arris\Core\Config\Exception\InvalidConfigException;
 use Arris\Core\Config\Exception\ParseException;
 use Arris\Core\Config\Exception\UnsupportedFormatException;
 use Symfony\Component\Yaml\Yaml as YamlParser;
@@ -45,6 +46,8 @@ class Yaml implements ParserInterface
      */
     public function parseString($config): array
     {
+        $isBlank = trim($config) === '';
+
         try {
             $data = YamlParser::parse($config, YamlParser::PARSE_CONSTANT);
         } catch (Throwable $exception) {
@@ -54,7 +57,19 @@ class Yaml implements ParserInterface
             ]);
         }
 
-        return (array)$data;
+        if ($data === null) {
+            if ($isBlank) {
+                return [];
+            }
+
+            throw new InvalidConfigException('YAML configuration root must be an object or array');
+        }
+
+        if (!is_array($data)) {
+            throw new InvalidConfigException('YAML configuration root must be an object or array');
+        }
+
+        return $data;
     }
 
     /**

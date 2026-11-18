@@ -67,16 +67,13 @@ class IniTest extends TestCase
 
     /**
      * @covers \Arris\Core\Config\Parser\Ini::parseString()
-     * @covers \Arris\Core\Config\Parser\Ini::parse()
      */
-    public function testEmptyIniDoesNotReusePreviousError()
+    public function testEmptyAndCommentOnlyIniReturnEmptyArray()
     {
         @trigger_error('stale warning from host', E_USER_WARNING);
 
-        $this->expectException(\Arris\Core\Config\Exception\ParseException::class);
-        $this->expectExceptionMessage('No parsable content');
-
-        $this->ini->parseString('');
+        $this->assertSame([], $this->ini->parseString(''));
+        $this->assertSame([], $this->ini->parseString("; comment\n# comment\n"));
     }
 
     /**

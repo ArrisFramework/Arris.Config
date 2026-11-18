@@ -293,4 +293,10 @@ class AppConfigTest extends TestCase
         $this->assertSame(2, $added->get('lit\\.x'));
         $this->assertNull($added->get('lit.x'));
     }
+
+    #[Test]
+    public function appConfigIsFinal(): void
+    {
+        $this->assertTrue((new \ReflectionClass(AppConfig::class))->isFinal());
+    }
 }

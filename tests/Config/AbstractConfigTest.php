@@ -168,8 +168,8 @@ class AbstractConfigTest extends TestCase
                 'name' => 'mydatabase'
             ]
         ]);
-        $this->config->get('config'); //Just get to set related cache
-        $this->config->get('config.database'); //Just get to set related cache
+        $this->config->get('config');
+        $this->config->get('config.database');
 
         $this->config->set('config.database.host', '127.0.0.1');
         $expected = [
@@ -190,7 +190,7 @@ class AbstractConfigTest extends TestCase
     /**
      * @covers AbstractConfig::set()
      */
-    public function testCacheWithNestedMiddleArray()
+    public function testSetWithNestedMiddleArray()
     {
         $this->config->set('config', [
           'database' => [
@@ -198,10 +198,10 @@ class AbstractConfigTest extends TestCase
               'name' => 'mydatabase'
           ]
         ]);
-        $this->config->get('config'); //Just get to set related cache
-        $this->config->get('config.database'); //Just get to set related cache
-        $this->config->get('config.database.host'); //Just get to set related cache
-        $this->config->get('config.database.name'); //Just get to set related cache
+        $this->config->get('config');
+        $this->config->get('config.database');
+        $this->config->get('config.database.host');
+        $this->config->get('config.database.name');
 
         $this->config->set('config.database', [
           'host' => '127.0.0.1',
@@ -299,7 +299,6 @@ class AbstractConfigTest extends TestCase
             ]
         );
 
-        // Trigger the cache
         $this->config->get('host');
         $this->config->merge($remote);
 
@@ -357,118 +356,26 @@ class AbstractConfigTest extends TestCase
     }
 
     /**
-     * @covers AbstractConfig::current()
+     * @covers AbstractConfig::getIterator()
      */
-    public function testCurrent()
+    public function testGetIteratorReturnsIndependentIterators()
     {
-        /* Reset to the beginning of the test config */
-        $this->config->rewind();
-        $this->assertSame($this->config['host'], $this->config->current());
+        $first = $this->config->getIterator();
+        $second = $this->config->getIterator();
 
-        /* Step through each of the other elements of the test config */
-        $this->config->next();
-        $this->assertSame($this->config['port'], $this->config->current());
-        $this->config->next();
-        $this->assertSame($this->config['servers'], $this->config->current());
-        $this->config->next();
-        $this->assertSame($this->config['application'], $this->config->current());
-        $this->config->next();
-        $this->assertSame($this->config['user'], $this->config->current());
+        $this->assertSame('host', $first->key());
+        $this->assertSame('host', $second->key());
 
-        /* Step beyond the end and confirm the result */
-        $this->config->next();
-        $this->assertFalse($this->config->current());
+        $first->next();
+
+        $this->assertSame('port', $first->key());
+        $this->assertSame('host', $second->key());
     }
 
     /**
-     * @covers AbstractConfig::key()
-     */
-    public function testKey()
-    {
-        /* Reset to the beginning of the test config */
-        $this->config->rewind();
-        $this->assertSame('host', $this->config->key());
-
-        /* Step through each of the other elements of the test config */
-        $this->config->next();
-        $this->assertSame('port', $this->config->key());
-        $this->config->next();
-        $this->assertSame('servers', $this->config->key());
-        $this->config->next();
-        $this->assertSame('application', $this->config->key());
-        $this->config->next();
-        $this->assertSame('user', $this->config->key());
-
-        /* Step beyond the end and confirm the result */
-        $this->config->next();
-        $this->assertNull($this->config->key());
-    }
-
-    /**
-     * @covers AbstractConfig::next()
-     */
-    public function testNext()
-    {
-        /* Reset to the beginning of the test config */
-        $this->config->rewind();
-
-        /* Step through each of the other elements of the test config */
-        $this->assertSame($this->config['port'], $this->config->next());
-        $this->assertSame($this->config['servers'], $this->config->next());
-        $this->assertSame($this->config['application'], $this->config->next());
-        $this->assertSame($this->config['user'], $this->config->next());
-
-        /* Step beyond the end and confirm the result */
-        $this->assertFalse($this->config->next());
-    }
-
-    /**
-     * @covers AbstractConfig::rewind()
-     */
-    public function testRewind()
-    {
-        /* Rewind from somewhere out in the array */
-        $this->config->next();
-        $this->config->next();
-        $this->assertSame($this->config['host'], $this->config->rewind());
-
-        /* Rewind again from the beginning of the array */
-        $this->assertSame($this->config['host'], $this->config->rewind());
-    }
-
-    /**
-     * @covers AbstractConfig::valid()
-     */
-    public function testValid()
-    {
-        /* Reset to the beginning of the test config */
-        $this->config->rewind();
-        $this->assertTrue($this->config->valid());
-
-        /* Step through each of the other elements of the test config */
-        $this->config->next();
-        $this->assertTrue($this->config->valid());
-        $this->config->next();
-        $this->assertTrue($this->config->valid());
-        $this->config->next();
-        $this->assertTrue($this->config->valid());
-        $this->config->next();
-        $this->assertTrue($this->config->valid());
-
-        /* Step beyond the end and confirm the result */
-        $this->config->next();
-        $this->assertFalse($this->config->valid());
-    }
-
-    /**
-     * Tests to verify that Iterator is properly implemented by using a foreach
-     * loop on the test config
+     * Tests that IteratorAggregate works through foreach.
      *
-     * @covers Config::current()
-     * @covers Config::next()
-     * @covers Config::key()
-     * @covers Config::valid()
-     * @covers Config::rewind()
+     * @covers AbstractConfig::getIterator()
      */
     public function testIterator()
     {
@@ -589,23 +496,47 @@ class AbstractConfigTest extends TestCase
     /**
      * @covers AbstractConfig::set()
      */
-    public function testSetNullThrows()
+    public function testSetNullIsStored()
     {
-        $this->expectException(\Arris\Core\Config\Exception\InvalidValueException::class);
-
         $config = new SimpleConfig(['a' => ['b' => 1]]);
         $config->set('a.b', null);
+
+        $this->assertTrue($config->has('a.b'));
+        $this->assertNull($config->get('a.b'));
     }
 
     /**
      * @covers AbstractConfig::set()
      */
-    public function testSetNullInsideArrayThrows()
+    public function testSetNullInsideArrayIsStored()
     {
-        $this->expectException(\Arris\Core\Config\Exception\InvalidValueException::class);
-
         $config = new SimpleConfig([]);
         $config->set('a', ['b' => null]);
+
+        $this->assertTrue($config->has('a.b'));
+        $this->assertNull($config->get('a.b'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetListWithNullIsStored()
+    {
+        $config = new SimpleConfig([]);
+        $config->set('a', [1, null, 3]);
+
+        $this->assertSame([1, null, 3], $config->get('a'));
+    }
+
+    /**
+     * @covers AbstractConfig::set()
+     */
+    public function testSetNullOverArrayThrows()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\StructureConflictException::class);
+
+        $config = new SimpleConfig(['a' => ['b' => 1]]);
+        $config->set('a', null);
     }
 
     /**
@@ -844,5 +775,64 @@ class AbstractConfigTest extends TestCase
         $this->assertSame(['b' => 1], $config->get('x'));
         $this->assertSame(3, $config->get('y.b\\.c'));
         $this->assertNull($config->get('y.b.c'));
+    }
+
+    /**
+     * @covers AbstractConfig::getAll()
+     */
+    public function testGetAllReturnsWholeConfig()
+    {
+        $config = new SimpleConfig(['a' => 1]);
+
+        $this->assertSame($config->all(), $config->getAll());
+        $this->assertSame($config->all(), $config->get('*'));
+    }
+
+    /**
+     * @covers AbstractConfig::getAllMatch()
+     */
+    public function testGetAllMatchIsNotImplemented()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\NotImplementedException::class);
+
+        (new SimpleConfig([]))->getAllMatch('*');
+    }
+
+    /**
+     * @covers AbstractConfig::get()
+     * @covers AbstractConfig::has()
+     * @covers AbstractConfig::set()
+     * @covers AbstractConfig::remove()
+     */
+    public function testNonStringKeysAreRejected()
+    {
+        $config = new SimpleConfig([]);
+
+        foreach ([
+            fn() => $config->get([]),
+            fn() => $config->has([]),
+            fn() => $config->set([], 1),
+            fn() => $config->remove([]),
+        ] as $operation) {
+            try {
+                $operation();
+                $this->fail('Expected InvalidArgumentException');
+            } catch (\InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    /**
+     * @covers AbstractConfig::get()
+     */
+    public function testDirectDataMutationIsVisible()
+    {
+        $config = new SimpleConfig(['a' => 1]);
+        $this->assertSame(1, $config->get('a'));
+
+        $config->data['a'] = 2;
+
+        $this->assertSame(2, $config->get('a'));
     }
 }

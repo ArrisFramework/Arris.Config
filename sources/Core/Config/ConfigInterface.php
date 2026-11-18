@@ -1,49 +1,57 @@
 <?php
+declare(strict_types=1);
 
 namespace Arris\Core\Config;
 
 /**
- * Config interface
+ * Config interface.
  */
 interface ConfigInterface
 {
     /**
      * Gets a configuration setting using a simple or nested key.
-     * Nested keys are similar to JSON paths that use the
-     * dot notation.
-     *
-     * @param  string $key
-     * @param  mixed  $default
-     *
-     * @return mixed
      */
     public function get($key, $default = null);
 
     /**
-     * Function for setting configuration values, using
-     * either simple or nested keys.
-     *
-     * @param  string $key
-     * @param  mixed  $value
-     *
-     * @return void
+     * Sets a configuration value using a simple or nested key.
      */
-    public function set($key, $value);
+    public function set($key, $value): void;
 
     /**
-     * Function for checking if configuration values exist, using
-     * either simple or nested keys.
-     *
-     * @param  string $key
-     *
-     * @return boolean
+     * Checks whether a configuration value exists.
      */
     public function has($key): bool;
-    
+
     /**
-     * Get all of the configuration items
-     *
-     * @return array
+     * Returns the whole configuration.
      */
-    public function all();
+    public function all(): array;
+
+    /**
+     * Returns the whole configuration.
+     */
+    public function getAll(): array;
+
+    /**
+     * Returns configuration values matching a mask.
+     *
+     * @throws \Arris\Core\Config\Exception\NotImplementedException
+     */
+    public function getAllMatch(string $mask): array;
+
+    /**
+     * Removes a configuration value.
+     */
+    public function remove($key): void;
+
+    /**
+     * Merges another configuration layer.
+     */
+    public function merge(ConfigInterface $config): ConfigInterface;
+
+    /**
+     * Replaces a node by path or the whole configuration.
+     */
+    public function replace(array|string $target, mixed $value = null);
 }

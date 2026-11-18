@@ -2,6 +2,7 @@
 
 namespace Arris\Core\Config\Parser;
 
+use Arris\Core\Config\Exception\InvalidConfigException;
 use Arris\Core\Config\Exception\ParseException;
 
 /**
@@ -73,6 +74,10 @@ class Json implements ParserInterface
             ];
 
             throw new ParseException($error);
+        }
+
+        if ($data !== null && !is_array($data)) {
+            throw new InvalidConfigException('JSON configuration root must be an object or array');
         }
 
         return $data;

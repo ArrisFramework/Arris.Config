@@ -61,4 +61,16 @@ class JsonTest extends TestCase
         $this->assertSame('localhost', $string['host']);
         $this->assertSame(80, $string['port']);
     }
+
+    public function testLoadScalarJsonThrowsInvalidConfig()
+    {
+        $this->expectException(\Arris\Core\Config\Exception\InvalidConfigException::class);
+
+        $this->json->parseString('"foo"');
+    }
+
+    public function testLoadJsonNullReturnsEmptyArray()
+    {
+        $this->assertSame([], $this->json->parseString('null'));
+    }
 }
