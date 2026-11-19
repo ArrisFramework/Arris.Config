@@ -22,7 +22,7 @@ final class AppConfig extends AbstractConfig
     public function __construct(array $files = [], array $defaults = [])
     {
         $loaded = (new Config($files))->all();
-        $this->data = KeyPath::mergePatch($defaults, $loaded);
+        $this->setData(KeyPath::mergePatch($defaults, $loaded));
     }
 
     /**
@@ -46,7 +46,7 @@ final class AppConfig extends AbstractConfig
         array $defaults = []
     ): self {
         $config = new self();
-        $config->data = KeyPath::mergePatch($defaults, $parser->parseString($configuration));
+        $config->setData(KeyPath::mergePatch($defaults, $parser->parseString($configuration)));
 
         return $config;
     }
@@ -54,9 +54,9 @@ final class AppConfig extends AbstractConfig
     /**
      * Adds a configuration layer to the existing data.
      */
-    public function add(array $config): self
+    public function add(array $config): static
     {
-        $this->data = KeyPath::mergePatch($this->data ?? [], $config);
+        $this->setData(KeyPath::mergePatch($this->data ?? [], $config));
 
         return $this;
     }

@@ -10,18 +10,20 @@ interface ConfigInterface
 {
     /**
      * Gets a configuration setting using a simple or nested key.
+     *
+     * Called without arguments, returns the whole configuration.
      */
-    public function get($key, $default = null);
+    public function get(mixed $key = null, mixed $default = null): mixed;
 
     /**
      * Sets a configuration value using a simple or nested key.
      */
-    public function set($key, $value): void;
+    public function set(mixed $key, mixed $value): void;
 
     /**
      * Checks whether a configuration value exists.
      */
-    public function has($key): bool;
+    public function has(mixed $key): bool;
 
     /**
      * Returns the whole configuration.
@@ -43,15 +45,15 @@ interface ConfigInterface
     /**
      * Removes a configuration value.
      */
-    public function remove($key): void;
+    public function remove(mixed $key): void;
 
     /**
      * Merges another configuration layer.
      */
-    public function merge(ConfigInterface $config): ConfigInterface;
+    public function merge(ConfigInterface $config): static;
 
     /**
      * Replaces a node by path or the whole configuration.
      */
-    public function replace(array|string $target, mixed $value = null);
+    public function replace(array|string $target, mixed $value = null): static;
 }

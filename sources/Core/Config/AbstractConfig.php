@@ -22,7 +22,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     /**
      * Stores the configuration data.
      */
-    public ?array $data = null;
+    protected ?array $data = null;
 
     public function __construct(array $data = [])
     {
@@ -41,11 +41,19 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     }
 
     /**
+     * Replaces the internal data array. Kept for subclasses and factories.
+     */
+    protected function setData(array $data): void
+    {
+        $this->data = $data;
+    }
+
+    /**
      * {@inheritDoc}
      */
-    public function get($key, $default = null)
+    public function get(mixed $key = null, mixed $default = null): mixed
     {
-        if ($key === '*') {
+        if (func_num_args() === 0) {
             return $this->getAll();
         }
 
@@ -76,7 +84,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
      * Strict set: the kind of an existing node cannot change. Use replace()
      * for an explicit replacement.
      */
-    public function set($key, $value): void
+    public function set(mixed $key, mixed $value): void
     {
         $data = $this->data ?? [];
         KeyPath::set($data, self::normalizeKey($key), $value);
@@ -118,7 +126,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     /**
      * {@inheritDoc}
      */
-    public function has($key): bool
+    public function has(mixed $key): bool
     {
         [$found] = KeyPath::get($this->data ?? [], self::normalizeKey($key));
 
@@ -128,7 +136,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     /**
      * Merge a configuration layer. Null in the incoming data deletes a key.
      */
-    public function merge(ConfigInterface $config): ConfigInterface
+    public function merge(ConfigInterface $config): static
     {
         $this->data = KeyPath::mergePatch($this->data ?? [], $config->all());
 
@@ -152,28 +160,25 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     }
 
     /**
-     * Gets a value using the offset as a key.
-     */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
-    {
-        return $this->get($offset);
-    }
-
-    /**
      * Checks if a key exists.
      */
-    #[\ReturnTypeWillChange]
-    public function offsetExists($offset)
+    public function offsetExists(mixed $offset): bool
     {
         return $this->has($offset);
     }
 
     /**
+     * Gets a value using the offset as a key.
+     */
+    public function offsetGet(mixed $offset): mixed
+    {
+        return $this->get($offset);
+    }
+
+    /**
      * Sets a value using the offset as a key.
      */
-    #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value)
+    public function offsetSet(mixed $offset, mixed $value): void
     {
         if ($offset === null) {
             throw new InvalidArgumentException('Config keys cannot be appended without a key');
@@ -185,8 +190,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     /**
      * Deletes a key and its value.
      */
-    #[\ReturnTypeWillChange]
-    public function offsetUnset($offset)
+    public function offsetUnset(mixed $offset): void
     {
         $this->remove($offset);
     }
@@ -194,7 +198,7 @@ abstract class AbstractConfig implements ArrayAccess, ConfigInterface, IteratorA
     /**
      * Remove a value using the offset as a key.
      */
-    public function remove($key): void
+    public function remove(mixed $key): void
     {
         $data = $this->data ?? [];
         KeyPath::remove($data, self::normalizeKey($key));

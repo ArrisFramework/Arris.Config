@@ -146,6 +146,10 @@ final class KeyPath
      */
     public static function mergeBase(array $base, array $patch): array
     {
+        if (self::replacesRoot($base, $patch)) {
+            return $patch;
+        }
+
         return self::mergeLayers($base, $patch, false);
     }
 
@@ -154,7 +158,28 @@ final class KeyPath
      */
     public static function mergePatch(array $base, array $patch): array
     {
+        if (self::replacesRoot($base, $patch)) {
+            return $patch;
+        }
+
         return self::mergeLayers($base, $patch, true);
+    }
+
+    /**
+     * A list at the root always replaces the base; an empty patch is a no-op.
+     * Only two non-empty associative arrays are merged key by key.
+     */
+    private static function replacesRoot(array $base, array $patch): bool
+    {
+        if ($patch === []) {
+            return false;
+        }
+
+        if (array_is_list($patch)) {
+            return true;
+        }
+
+        return $base !== [] && array_is_list($base);
     }
 
     /**

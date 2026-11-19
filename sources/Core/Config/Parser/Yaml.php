@@ -26,8 +26,10 @@ class Yaml implements ParserInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseFile($filename)
+    public function parseFile(string $filename): array
     {
         $contents = @file_get_contents($filename);
 
@@ -38,13 +40,15 @@ class Yaml implements ParserInterface
             ]);
         }
 
-        return $this->parseString($contents);
+        return $this->parseString($contents, $filename);
     }
 
     /**
      * {@inheritDoc}
+     *
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseString($config): array
+    public function parseString(string $config, ?string $filename = null): array
     {
         $isBlank = trim($config) === '';
 
@@ -53,6 +57,7 @@ class Yaml implements ParserInterface
         } catch (Throwable $exception) {
             throw new ParseException([
                 'message'   => 'Error parsing YAML string',
+                'file'      => $filename ?? '',
                 'exception' => $exception,
             ]);
         }

@@ -90,7 +90,7 @@ class AppConfigTest extends TestCase
     }
 
     #[Test]
-    public function addIsVisibleAfterCacheWarmUp(): void
+    public function addIsVisibleAfterRead(): void
     {
         $config = new AppConfig([], ['a' => 1]);
         $this->assertSame(1, $config->get('a'));
@@ -217,6 +217,18 @@ class AppConfigTest extends TestCase
 
         $this->assertFalse($config->has('a'));
         $this->assertSame(2, $config->get('b'));
+    }
+
+    #[Test]
+    public function fileNullWithoutDefaultIsDropped(): void
+    {
+        $configFile = $this->tempDir . '/null-without-default.json';
+        file_put_contents($configFile, '{"a":null,"b":1}');
+
+        $config = new AppConfig([$configFile]);
+
+        $this->assertFalse($config->has('a'));
+        $this->assertSame(1, $config->get('b'));
     }
 
     #[Test]

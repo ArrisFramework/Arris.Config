@@ -25,8 +25,10 @@ class Toml implements ParserInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @throws ParseException
      */
-    public function parseFile($filename)
+    public function parseFile(string $filename): array
     {
         $contents = @file_get_contents($filename);
 
@@ -37,19 +39,22 @@ class Toml implements ParserInterface
             ]);
         }
 
-        return $this->parseString($contents);
+        return $this->parseString($contents, $filename);
     }
 
     /**
      * {@inheritDoc}
+     *
+     * @throws ParseException
      */
-    public function parseString($config)
+    public function parseString(string $config, ?string $filename = null): array
     {
         try {
             return TomlParser::parseToArray($config);
         } catch (Throwable $exception) {
             throw new ParseException([
                 'message'   => 'Error parsing TOML string',
+                'file'      => $filename ?? '',
                 'exception' => $exception,
             ]);
         }

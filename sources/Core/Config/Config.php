@@ -3,16 +3,15 @@ declare(strict_types=1);
 
 namespace Arris\Core\Config;
 
-use Arris\Core\Config\Exception\EmptyDirectoryException;
 use Arris\Core\Config\Exception\FileNotFoundException;
 use Arris\Core\Config\Exception\UnsupportedFormatException;
 use Arris\Core\Config\Parser\ParserInterface;
-use FilesystemIterator;
 use InvalidArgumentException;
-use UnexpectedValueException;
 
 /**
  * Read-only configuration loader.
+ *
+ * Only explicit file sources are supported. Directories are not scanned.
  */
 class Config extends AbstractConfig
 {
@@ -33,7 +32,7 @@ class Config extends AbstractConfig
     /**
      * Ignore non-existent config files instead of throwing?
      */
-    private bool $ignore_non_existent_files;
+    private bool $ignoreNonExistentFiles;
 
     /**
      * @var array<string, class-string<ParserInterface>>|null
@@ -41,25 +40,30 @@ class Config extends AbstractConfig
     private ?array $parserMap = null;
 
     /**
+     * @var array<string, ParserInterface>
+     */
+    private array $parserInstances = [];
+
+    /**
      * @param array $values Filename(s) or an empty array
      * @param ParserInterface|null $parser Force this parser for every file
      * @param bool $ignoreNonExistentFiles Skip missing files instead of throwing
      *
-     * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException
+     * @throws FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
     public function __construct(
         array $values = [],
         ?ParserInterface $parser = null,
         bool $ignoreNonExistentFiles = false
     ) {
-        $this->ignore_non_existent_files = $ignoreNonExistentFiles;
+        $this->ignoreNonExistentFiles = $ignoreNonExistentFiles;
         parent::__construct($this->loadFromFile($values, $parser));
     }
 
     /**
      * Static loader for explicit files.
      *
-     * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException
+     * @throws FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
     public static function load(
         array $values = [],
@@ -71,6 +75,8 @@ class Config extends AbstractConfig
 
     /**
      * Static loader for a single file.
+     *
+     * @throws FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
     public static function fromFile(
         string $file,
@@ -82,40 +88,18 @@ class Config extends AbstractConfig
 
     /**
      * Static loader for a configuration string. The parser is required.
+     *
+     * @throws \Arris\Core\Config\Exception\ParseException
+     * @throws \Arris\Core\Config\Exception\InvalidConfigException
      */
     public static function fromString(string $configuration, ParserInterface $parser): static
     {
         $data = $parser->parseString($configuration);
         $config = static::createEmpty();
 
-        $config->data = KeyPath::mergeBase($config->getDefaults(), $data);
+        $config->setData(KeyPath::mergeBase($config->getDefaults(), $data));
 
         return $config;
-    }
-
-    /**
-     * Loads every supported file from a directory.
-     *
-     * @deprecated Explicit file lists are preferred. Directory scanning is kept
-     *             for backwards compatibility; do not use it for new code.
-     */
-    public static function fromDirectory(
-        string $directory,
-        ?ParserInterface $parser = null,
-        bool $ignoreNonExistentFiles = false
-    ): static {
-        if (!is_dir($directory)) {
-            if ($ignoreNonExistentFiles) {
-                return new static([], $parser, true);
-            }
-
-            throw new FileNotFoundException("Configuration directory: [$directory] cannot be found");
-        }
-
-        $resolver = static::createEmpty();
-        $files = $resolver->resolveDirectory($directory, $parser);
-
-        return new static($files, $parser, $ignoreNonExistentFiles);
     }
 
     /**
@@ -129,7 +113,7 @@ class Config extends AbstractConfig
     /**
      * Loads configuration from explicit files.
      *
-     * @throws EmptyDirectoryException|FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
+     * @throws FileNotFoundException|UnsupportedFormatException|InvalidArgumentException
      */
     protected function loadFromFile(array $path, ?ParserInterface $parser = null): array
     {
@@ -195,15 +179,15 @@ class Config extends AbstractConfig
 
         if (is_dir($path)) {
             throw new InvalidArgumentException(
-                "Configuration path: [$path] is a directory; use Config::fromDirectory()"
+                "Configuration path: [$path] is a directory; pass explicit files instead"
             );
         }
 
         if (file_exists($path)) {
-            throw new FileNotFoundException("Configuration path: [$path] is not a file or directory");
+            throw new FileNotFoundException("Configuration path: [$path] is not a file");
         }
 
-        if ($this->ignore_non_existent_files) {
+        if ($this->ignoreNonExistentFiles) {
             return [];
         }
 
@@ -211,86 +195,27 @@ class Config extends AbstractConfig
     }
 
     /**
-     * Resolves a directory into a sorted list of files.
-     *
-     * @return list<string>
-     *
-     * @throws EmptyDirectoryException|FileNotFoundException
-     */
-    private function resolveDirectory(string $directory, ?ParserInterface $parser): array
-    {
-        if (!is_readable($directory)) {
-            throw new FileNotFoundException("Configuration directory: [$directory] is not readable");
-        }
-
-        try {
-            $iterator = new FilesystemIterator($directory);
-        } catch (UnexpectedValueException $exception) {
-            throw new FileNotFoundException(
-                "Configuration directory: [$directory] is not readable",
-                0,
-                $exception
-            );
-        }
-
-        $allowedExtensions = $parser === null
-            ? null
-            : array_map('strtolower', $parser::getSupportedExtensions());
-
-        $files = [];
-
-        foreach ($iterator as $fileInfo) {
-            if (!$fileInfo->isFile()) {
-                continue;
-            }
-
-            $filename = $fileInfo->getFilename();
-
-            if ($filename === '' || $filename[0] === '.') {
-                continue;
-            }
-
-            $file = $fileInfo->getPathname();
-
-            if ($this->isIgnoredFile($file)) {
-                continue;
-            }
-
-            if ($allowedExtensions !== null) {
-                if (!in_array($this->getExtension($file), $allowedExtensions, true)) {
-                    continue;
-                }
-            } elseif (!$this->supportsExtension($this->getExtension($file))) {
-                continue;
-            }
-
-            $files[] = $file;
-        }
-
-        if ($files === []) {
-            throw new EmptyDirectoryException("Configuration directory: [$directory] is empty");
-        }
-
-        sort($files);
-
-        return $files;
-    }
-
-    /**
-     * Gets a parser for a given file extension.
+     * Gets a parser for a given file extension. Parser instances are cached.
      *
      * @throws UnsupportedFormatException If `$extension` is an unsupported file format
      */
     protected function getParser(string $extension): ParserInterface
     {
         $extension = strtolower($extension);
+
+        if (isset($this->parserInstances[$extension])) {
+            return $this->parserInstances[$extension];
+        }
+
         $class = $this->parserMap()[$extension] ?? null;
 
         if ($class === null) {
-            throw new UnsupportedFormatException('Unsupported configuration format: ' . $extension);
+            $label = $extension === '' ? '(none)' : $extension;
+
+            throw new UnsupportedFormatException('Unsupported configuration format: ' . $label);
         }
 
-        return new $class();
+        return $this->parserInstances[$extension] = new $class();
     }
 
     /**
@@ -330,13 +255,5 @@ class Config extends AbstractConfig
     private function getExtension(string $path): string
     {
         return strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    }
-
-    /**
-     * Files ending with .bak are backups and are skipped during directory scans.
-     */
-    private function isIgnoredFile(string $path): bool
-    {
-        return str_ends_with(strtolower($path), '.bak');
     }
 }

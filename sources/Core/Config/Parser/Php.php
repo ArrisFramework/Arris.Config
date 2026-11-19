@@ -1,9 +1,10 @@
 <?php
+declare(strict_types=1);
 
 namespace Arris\Core\Config\Parser;
 
+use Arris\Core\Config\Exception\InvalidConfigException;
 use Arris\Core\Config\Exception\ParseException;
-use Arris\Core\Config\Exception\UnsupportedFormatException;
 
 /**
  * PHP parser
@@ -19,36 +20,32 @@ class Php implements ParserInterface
 
     /**
      * {@inheritDoc}
-     * Loads a PHP file and gets its' contents as an array
      *
-     * @throws ParseException             If the PHP file throws an exception
-     * @throws UnsupportedFormatException If the PHP file does not return an array
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseFile($filename)
+    public function parseFile(string $filename): array
     {
         try {
             $data = require $filename;
-            return (array)$this->parse($data, $filename);
-        } catch (ParseException|UnsupportedFormatException $exception) {
+
+            return $this->parse($data, $filename);
+        } catch (ParseException|InvalidConfigException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            throw new ParseException(
-                [
-                    'message'   => 'PHP file threw an exception',
-                    'exception' => $exception,
-                ]
-            );
+            throw new ParseException([
+                'message'   => 'PHP file threw an exception',
+                'file'      => $filename,
+                'exception' => $exception,
+            ]);
         }
     }
 
     /**
      * {@inheritDoc}
-     * Loads a PHP string and gets its' contents as an array
      *
-     * @throws ParseException             If the PHP string throws an exception
-     * @throws UnsupportedFormatException If the PHP string does not return an array
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseString($config)
+    public function parseString(string $config, ?string $filename = null): array
     {
         // Handle PHP start tag
         $config = trim($config);
@@ -58,53 +55,45 @@ class Php implements ParserInterface
 
         try {
             $data = $this->isolate($config);
-            return (array)$this->parse($data);
-        } catch (ParseException|UnsupportedFormatException $exception) {
+
+            return $this->parse($data, $filename);
+        } catch (ParseException|InvalidConfigException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            throw new ParseException(
-                [
-                    'message'   => 'PHP string threw an exception',
-                    'exception' => $exception,
-                ]
-            );
+            throw new ParseException([
+                'message'   => 'PHP string threw an exception',
+                'file'      => $filename ?? '',
+                'exception' => $exception,
+            ]);
         }
     }
 
     /**
-     * Completes parsing of PHP data
+     * Completes parsing of PHP data.
      *
-     * @param  array $data
-     * @param  string $filename
-     *
-     * @return array|null
-     * @throws UnsupportedFormatException
+     * @throws InvalidConfigException
      */
-    protected function parse($data = null, $filename = null)
+    protected function parse(mixed $data = null, ?string $filename = null): array
     {
         // If we have a closure, run it and expect an array back
         if ($data instanceof \Closure) {
             $data = $data();
         }
 
-        // Check for array, if It's anything else, throw an exception
+        // Check for array; anything else is not a configuration tree
         if (!is_array($data)) {
-            throw new UnsupportedFormatException('PHP data does not return an array');
+            throw new InvalidConfigException('PHP data does not return an array');
         }
 
         return $data;
     }
 
     /**
-     * Runs PHP string in isolated method
-     *
-     * @param  string $EGsfKPdue7ahnMTy
-     *
-     * @return array
+     * Runs PHP code in an isolated scope.
      */
-    protected function isolate($EGsfKPdue7ahnMTy)
+    protected function isolate(string $code): mixed
     {
-        return eval($EGsfKPdue7ahnMTy);
+        return eval($code);
     }
 
     /**

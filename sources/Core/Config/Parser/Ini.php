@@ -17,7 +17,7 @@ class Ini implements ParserInterface
     /**
      * {@inheritDoc}
      */
-    public function parseFile($filename)
+    public function parseFile(string $filename): array
     {
         $contents = @file_get_contents($filename);
 
@@ -28,22 +28,22 @@ class Ini implements ParserInterface
             ]);
         }
 
-        return $this->parseString($contents);
+        return $this->parseString($contents, $filename);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function parseString($config)
+    public function parseString(string $config, ?string $filename = null): array
     {
-        $withoutComments = preg_replace('/^\s*[;#].*$/m', '', (string)$config);
+        $withoutComments = preg_replace('/^\s*[;#].*$/m', '', $config);
 
         if (trim((string)$withoutComments) === '') {
             return [];
         }
 
         error_clear_last();
-        $data = @parse_ini_string((string)$config, true);
+        $data = @parse_ini_string($config, true);
 
         if ($data === false || $data === []) {
             $error = error_get_last();
@@ -51,6 +51,10 @@ class Ini implements ParserInterface
             if (!is_array($error)) {
                 $error = ['message' => 'No parsable content in data.'];
             }
+
+            $error['type'] = E_ERROR;
+            $error['file'] = $filename ?? '';
+            $error['line'] = 0;
 
             error_clear_last();
 

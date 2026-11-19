@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Arris\Core\Config\Parser;
 
@@ -19,11 +20,10 @@ class Json implements ParserInterface
 
     /**
      * {@inheritDoc}
-     * Parses an JSON file as an array
      *
-     * @throws ParseException If there is an error parsing the JSON file
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseFile($filename)
+    public function parseFile(string $filename): array
     {
         $contents = @file_get_contents($filename);
 
@@ -34,46 +34,38 @@ class Json implements ParserInterface
             ]);
         }
 
-        return $this->parseString($contents);
+        return $this->parseString($contents, $filename);
     }
 
     /**
      * {@inheritDoc}
-     * Parses an JSON string as an array
      *
-     * @throws ParseException If there is an error parsing the JSON string
+     * @throws ParseException|InvalidConfigException
      */
-    public function parseString($config)
+    public function parseString(string $config, ?string $filename = null): array
     {
         $data = json_decode($config, true);
 
-        return (array)$this->parse($data);
+        return (array)$this->parse($data, $filename);
     }
 
     /**
-     * Completes parsing of JSON data
+     * Completes parsing of JSON data.
      *
-     * @param  array  $data
-     * @param  string $filename
-     * @return array|null
-     *
-     * @throws ParseException If there is an error parsing the JSON data
+     * @throws ParseException|InvalidConfigException
      */
-    protected function parse($data = null, $filename = null)
+    protected function parse(mixed $data = null, ?string $filename = null): mixed
     {
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $error_message  = 'Syntax error';
-            if (function_exists('json_last_error_msg')) {
-                $error_message = json_last_error_msg();
-            }
+            $error_message = function_exists('json_last_error_msg')
+                ? json_last_error_msg()
+                : 'Syntax error';
 
-            $error = [
+            throw new ParseException([
                 'message' => $error_message,
-                'type'    => json_last_error(),
-                'file'    => $filename,
-            ];
-
-            throw new ParseException($error);
+                'code'    => json_last_error(),
+                'file'    => $filename ?? '',
+            ]);
         }
 
         if ($data !== null && !is_array($data)) {

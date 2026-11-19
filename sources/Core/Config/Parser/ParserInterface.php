@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Arris\Core\Config\Parser;
 
@@ -17,27 +18,19 @@ interface ParserInterface
     public function __construct();
 
     /**
-     * Parses a configuration from file `$filename` and gets its contents as an array
-     *
-     * @param  string $filename
-     *
-     * @return array
+     * Parses a configuration from file `$filename` and returns its contents as an array.
      */
-    public function parseFile($filename);
+    public function parseFile(string $filename): array;
 
     /**
-     * Parses a configuration from string `$config` and gets its contents as an array
-     *
-     * @param  string $config
-     *
-     * @return array
+     * Parses a configuration from string `$config` and returns its contents as an array.
      */
-    public function parseString($config);
+    public function parseString(string $config): array;
 
     /**
-     * Returns an array of allowed file extensions for this parser
+     * Returns an array of allowed file extensions for this parser.
      *
-     * @return array
+     * @return list<string>
      */
     public static function getSupportedExtensions(): array;
 }
